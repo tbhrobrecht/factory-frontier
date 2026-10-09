@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factory-frontier"
+version = "0.1.0"
+description = "A modular reinforcement-learning teaching environment"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "gymnasium>=0.29"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[tool.setuptools.packages.find]
+include = ["factory_frontier*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
