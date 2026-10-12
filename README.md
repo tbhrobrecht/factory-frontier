@@ -11,6 +11,24 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
+## Student workspace
+
+All coursework belongs in the top-level `student/` directory. Students may
+read the complete environment source, but should not modify the official
+`factory_frontier/` package. During grading, only `student/` should be copied
+into a clean official environment.
+
+Start with:
+
+```powershell
+python -m student.student_view
+python -m student.evaluate
+python -m pytest student/tests
+```
+
+See [`student/README.md`](student/README.md) for the workspace layout, training
+scaffold, and submission boundary.
+
 ```python
 from factory_frontier import FactoryFrontier
 from factory_frontier.agents import RandomAgent
@@ -60,7 +78,11 @@ class MyAgent(Agent):
         return int(legal[0])
 ```
 
-See `factory_frontier/examples/student_agent.py`, `train_tabular.py`, and `evaluate.py`. `ModelAdapter` wraps callable models or objects with `predict`, accepts scalar actions or full canonical logits/Q-values, and masks illegal outputs. `TabularQAgent.save()` / `.load()` demonstrates a transparent checkpoint format without supplying an advanced assignment solution.
+The active starter files are in `student/`. Additional reference examples remain
+under `factory_frontier/examples/`. `ModelAdapter` wraps callable models or
+objects with `predict`, accepts scalar actions or full canonical logits/Q-values,
+and masks illegal outputs. `TabularQAgent.save()` / `.load()` demonstrates a
+transparent checkpoint format without supplying an advanced assignment solution.
 
 ## Curriculum
 
@@ -125,7 +147,10 @@ leaderboard, matches = round_robin(
 
 Tournament pairs play both seat assignments on every seed. Results include win/loss/draw, survival steps, progress, gathered resources, energy spent, and the engine event log. Call `MatchResult.save_replay(path)` or pass `replay_path` to `play_match` for JSON replay data; `render_replay` deterministically reconstructs ASCII frames. Matches call the same engine's simultaneous `step_multi`; there is no separate competition game.
 
-For submission, provide an importable `Agent` implementation plus any checkpoint files it loads. Avoid engine imports beyond the public action and agent APIs.
+For submission, provide the `student/` directory, including an importable
+`StudentAgent` implementation and any required checkpoint files. Grading should
+place it beside a clean official engine, so modifications outside `student/`
+cannot affect results.
 
 ## Layout
 
@@ -141,4 +166,5 @@ factory_frontier/
   rendering/     ASCII renderer
   examples/      student template and runnable examples
 tests/            deterministic unit and integration tests
+student/          writable coursework, training, evaluation, and student tests
 ```

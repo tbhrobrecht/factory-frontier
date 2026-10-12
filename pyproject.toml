@@ -17,6 +17,5 @@ dev = ["pytest>=7.4"]
 include = ["factory_frontier*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "student/tests"]
 addopts = "-q"
-

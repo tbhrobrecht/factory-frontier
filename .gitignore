@@ -153,6 +153,15 @@ activemq-data/
 .env
 .envrc
 .venv
+
+# Large student model artifacts should use the course artifact submission channel.
+student/checkpoints/*.pt
+student/checkpoints/*.pth
+student/checkpoints/*.ckpt
+student/checkpoints/*.onnx
+student/checkpoints/*.safetensors
+student/results/*
+!student/results/.gitkeep
 env/
 venv/
 ENV/
