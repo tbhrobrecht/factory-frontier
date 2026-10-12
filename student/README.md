@@ -5,6 +5,10 @@ read the rest of the repository to understand Factory Frontier, but do not
 modify the official `factory_frontier/` engine. During grading, only this
 `student/` directory is copied into a clean official environment.
 
+New students should begin with the hands-on
+[`WALKTHROUGH.md`](WALKTHROUGH.md) and complete its checklist before starting
+the first reinforcement-learning assignment.
+
 ## Setup
 
 Run these commands from the repository root in PowerShell:

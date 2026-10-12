@@ -26,8 +26,8 @@ python -m student.evaluate
 python -m pytest student/tests
 ```
 
-See [`student/README.md`](student/README.md) for the workspace layout, training
-scaffold, and submission boundary.
+Begin with [`student/WALKTHROUGH.md`](student/WALKTHROUGH.md), then use
+[`student/README.md`](student/README.md) as the workspace reference.
 
 ```python
 from factory_frontier import FactoryFrontier
