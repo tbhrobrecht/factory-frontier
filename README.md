@@ -4,7 +4,9 @@ Factory Frontier is a grid-based, Gymnasium-compatible reinforcement-learning te
 
 ## Install and try it
 
-```bash
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 python -m pytest
 ```
