@@ -9,6 +9,9 @@ New students should begin with the hands-on
 [`WALKTHROUGH.md`](WALKTHROUGH.md) and complete its checklist before starting
 the first reinforcement-learning assignment.
 
+For map symbols, entities, danger, actions, and the factory's objectives, see
+the [game guide and legend](GAME_README.md).
+
 ## Setup
 
 Run these commands from the repository root in PowerShell:
