@@ -56,6 +56,7 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
                 "visibility": spaces.MultiBinary((size, size)),
                 "action_mask": spaces.MultiBinary(ACTION_COUNT),
                 "map_shape": spaces.Box(0, size, (2,), dtype=np.int16),
+                "mining_nodes": spaces.MultiBinary((size, size)),
             }
         )
         self.rule_engine = RuleEngine(self.config, rules)

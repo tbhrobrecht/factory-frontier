@@ -61,6 +61,7 @@ Every preset returns the same structured, padded observation:
 - `visibility` — distinguishes unseen cells from empty cells
 - `action_mask` — one value per canonical action
 - `map_shape` — active height and width inside the padded grid
+- `mining_nodes` — `(16, 16)` visible mining locations, including beneath resources or entities
 
 Advanced mechanics are represented by zeros when absent. New actions must be appended, never inserted or reordered; new observation data should fill reserved/default-compatible fields or be added without changing existing fields.
 
@@ -123,6 +124,35 @@ episode ends. Position-only models reject overrides adding resources, danger,
 opponents, energy costs, advanced actions, or rule hooks. Custom reward
 components must also be stationary functions of position/action rather than
 episode history for this state representation to be valid.
+
+### Model-free control exercises
+
+`model_free_control` is an 8×8 fully observable navigation-and-refuelling task.
+Each seeded map has random walls and five resources, plus a protected route to
+the goal. A renewable mining node at `(7, 3)` is reachable in three east moves;
+a randomized wall-free monotone route leads onward from that stop to `(0, 7)`.
+The default task is solvable with mining before danger arrives. Other routes
+and resource stops remain available for students to explore.
+
+The factory starts with 8 energy and spends 1 per successful move. A collectible
+or a mining action supplies 1 energy. Each step costs `-0.1` reward, each gathered
+resource earns `+0.05`, a win earns `+10`, and a loss costs `-10`. Mining therefore
+has net reward `-0.05`: it is useful for fuel, not for farming return. Danger
+advances every five steps and destroys entities in covered columns every turn,
+including on entry. The 40-step cap matches the time when danger covers the map;
+destruction takes precedence over truncation or reaching the goal that turn.
+
+The observation exposes energy, time, danger, remaining resources, mining nodes,
+and legal actions. The reference Q-agent keys the full observation to avoid
+aliasing different maps or resource states. It is an exact-table baseline;
+students should investigate state abstractions and fixed training seeds before
+expecting efficient tabular learning or generalization to unseen layouts.
+Builds and jumps are disabled, and `transition_model()` remains unavailable.
+
+```powershell
+python -m student.student_view --config model_free_control
+python -m student.train --config model_free_control --episodes 100
+```
 
 ### Dynamic programming exercises
 

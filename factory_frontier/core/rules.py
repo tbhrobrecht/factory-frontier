@@ -237,9 +237,10 @@ class RuleEngine:
             entity.cooldown = max(0, entity.cooldown - 1)
 
     def _advance_danger(self, state: GameState) -> None:
-        if not self.config.danger_enabled or state.step_count % self.config.boundary_interval:
+        if not self.config.danger_enabled:
             return
-        state.danger_column += 1
+        if state.step_count % self.config.boundary_interval == 0:
+            state.danger_column += 1
         for entity in state.entities.values():
             if not entity.alive:
                 continue

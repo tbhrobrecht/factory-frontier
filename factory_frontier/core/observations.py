@@ -12,7 +12,7 @@ from factory_frontier.core.state import GameState
 
 OBSERVATION_FIELDS = (
     "grid", "entities", "entity_mask", "factory", "opponent", "danger", "visibility",
-    "action_mask", "map_shape",
+    "action_mask", "map_shape", "mining_nodes",
 )
 
 
@@ -69,6 +69,9 @@ def encode_observation(state: GameState, config: CurriculumConfig, owner: int = 
         if entity.alive:
             grid[entity.position] = 4 + int(entity.kind) + (4 if entity.owner != owner else 0)
     grid[visible == 0] = 0
+    mining_nodes = np.zeros((size, size), dtype=np.int8)
+    for position in state.mining_nodes:
+        mining_nodes[position] = visible[position]
 
     entities = np.zeros((config.max_entities, 8), dtype=np.float32)
     entity_mask = np.zeros(config.max_entities, dtype=np.int8)
@@ -119,4 +122,5 @@ def encode_observation(state: GameState, config: CurriculumConfig, owner: int = 
         "visibility": visible,
         "action_mask": action_mask(state, config, owner),
         "map_shape": np.asarray([state.height, state.width], dtype=np.int16),
+        "mining_nodes": mining_nodes,
     }

@@ -25,10 +25,15 @@ Resources help you earn reward and replenish energy. Movement, jumps, and
 building can spend energy, so choose routes and builds that support the goal.
 Zero energy does not itself destroy the factory, but it can prevent actions.
 
-The built-in presets reward each step with `-0.01`, each gathered resource unit
-with `+1`, a win with `+10`, and a loss with `-10`. These rewards guide learning;
+Except for `model_free_control`, built-in presets reward each step with `-0.01`,
+each gathered resource unit with `+1`, a win with `+10`, and a loss with `-10`.
+These rewards guide learning;
 they are separate from the competition score above. Custom configurations can
 change the weights.
+
+`model_free_control` uses `-0.1` per step and `+0.05` per resource, with the same
+win/loss rewards. Mining earns a net `-0.05` per turn, so refuel when needed
+rather than mining for points.
 
 ## Printed map legend
 
@@ -61,8 +66,9 @@ column. Read `observation["danger"]` to track the boundary.
 
 When enabled, danger advances every `boundary_interval` turns (five in the
 built-in presets). The boundary starts at column `-1`; its first advance covers
-column `0`. At each advance, living entities in covered columns are destroyed
-immediately. Walls do not protect them.
+column `0`. At the end of every turn, living entities in covered columns are
+destroyed, including those entering an already-covered column. Walls do not
+protect them. Danger is resolved before goal detection.
 
 - In single-player, covered columns satisfy `column <= danger_column`:
   danger moves from left to right.
@@ -71,7 +77,7 @@ immediately. Walls do not protect them.
 
 The four danger features are: enabled flag, boundary column divided by map
 width, distance from your factory to its side's boundary divided by width, and
-`boundary_interval / 100`. Destruction is checked on danger-advance turns;
+`boundary_interval / 100`. Destruction is checked every turn;
 the printed map does not mark covered cells between checks.
 
 In partially observable presets, the agent sees only cells within Manhattan
@@ -96,6 +102,9 @@ and opponent codes are relative to the agent receiving the observation.
 There is no grid code for danger or the goal. The grid is padded to `(16, 16)`;
 `map_shape` gives the active `(height, width)`. Entity codes cover underlying
 terrain. Use `entity_mask` to identify populated rows in the `entities` array.
+The separate `(16, 16)` binary `mining_nodes` layer identifies visible mining
+nodes even when a resource or factory covers their grid symbol. Unseen nodes
+are zero in partially observable presets.
 
 ## Actions and building
 
@@ -121,9 +130,18 @@ select a direction for these actions. A build starts a cooldown: with the
 default configuration, two intervening turns must pass before another build.
 Movement and other legal actions remain available during that cooldown.
 
-Factories start with 20 energy. Ordinary movement is free in the early
-presets and costs 0.1 energy from `model_free_control` onward; jumps cost 2.
+In `model_free_control`, factories start with 8 energy and movement costs 1.
+Other presets start with 20 energy; movement is free in early presets and
+costs 0.1 from `function_approximation` onward. Jumps cost 2.
 These costs and build settings can be overridden in custom configurations.
+
+The default `model_free_control` map guarantees a mining node at `(7, 3)`,
+reachable in three east moves, and a wall-free route onward to the goal. Five
+collectibles and random walls vary by seed. At least one mining action is
+required: starting energy plus all five collectibles supplies only 13 energy,
+while reaching the goal requires at least 14 moves. Danger covers the entire
+map at step 40, matching the episode cap; win before then. Death at the deadline
+is a termination rather than a time-limit truncation.
 
 ## Which mechanics appear in each preset?
 

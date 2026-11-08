@@ -66,9 +66,10 @@ PRESETS: dict[str, CurriculumConfig] = {
         "monte_carlo_td", width=6, height=6, slip_probability=0.1, max_steps=75
     ),
     "model_free_control": CurriculumConfig(
-        "model_free_control", width=8, height=8, map_generator="random", enabled_actions=(*_MOVE, Action.MINE),
-        resources_enabled=True, danger_enabled=True, resource_count=5, wall_density=0.08, movement_cost=0.1,
-        max_steps=150,
+        "model_free_control", width=8, height=8, map_generator="control", enabled_actions=(*_MOVE, Action.MINE),
+        resources_enabled=True, danger_enabled=True, resource_count=5, wall_density=0.08,
+        initial_energy=8.0, movement_cost=1.0, max_steps=40,
+        reward_weights={"time": -0.1, "resource": 0.05, "win": 10.0, "loss": -10.0},
     ),
     "function_approximation": CurriculumConfig(
         "function_approximation", width=12, height=12, map_generator="random", enabled_actions=_RICH,
