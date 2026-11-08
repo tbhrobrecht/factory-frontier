@@ -14,7 +14,7 @@ from factory_frontier.core.actions import ACTION_COUNT, MOVEMENT_ACTIONS, Action
 from factory_frontier.core.entities import EntityType, make_entity
 from factory_frontier.core.map_generation import generate_map
 from factory_frontier.core.observations import encode_observation
-from factory_frontier.core.rules import RuleEngine, RuleHook, movement_distribution
+from factory_frontier.core.rules import RuleEngine, RuleHook, action_mask, movement_distribution
 from factory_frontier.core.state import GameState
 from factory_frontier.rewards import RewardContext, RewardSystem
 from factory_frontier.rewards.components import RewardComponent
@@ -162,35 +162,68 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
     def transition_model(
         self,
     ) -> dict[tuple[int, int], dict[int, list[tuple[float, tuple[int, int], float, bool]]]]:
-        """Return P(s'|s,a), reward and terminal flags for finite model-based presets."""
+        """Return the stationary position-state model for movement-only presets.
+
+        Every canonical action is included, including masked actions (which wait).
+        The goal is absorbing with zero further reward; entering it earns the win
+        reward once. The external episode time limit is not part of this model:
+        outcomes report termination, not truncation. Model queries do not advance
+        the live episode or its random generator.
+        """
 
         state = self._require_state()
         if not self.config.expose_model:
             raise RuntimeError(f"Transition model is hidden in the {self.config.name!r} curriculum stage")
+        movement_actions = (Action.WAIT, *MOVEMENT_ACTIONS)
+        if (
+            self.config.resources_enabled
+            or self.config.opponent_enabled
+            or self.config.danger_enabled
+            or self.config.movement_cost != 0
+            or not set(self.config.enabled_actions) <= set(movement_actions)
+            or state.resources
+            or state.mining_nodes
+            or self.rule_engine.extra_rules
+        ):
+            raise ValueError("The position transition model requires movement-only, resource-free rules")
+        # Build from the map rather than the current episode's counters/terminal
+        # state, so the same MDP is returned even after stepping or finishing.
+        template = GameState(width=state.width, height=state.height, walls=set(state.walls))
+        template.entities[1] = make_entity(
+            1, EntityType.FACTORY, 0, (state.height - 1, 0), self.config.initial_energy
+        )
+        template.next_entity_id = 2
+        # Legality applies to the requested action, not again to a slipped
+        # direction (which may itself be disabled in a customized action set).
+        deterministic = self.config.with_overrides(slip_probability=0.0, enabled_actions=movement_actions)
+        engine = RuleEngine(deterministic)
+        goal = (0, state.width - 1)
         model: dict[tuple[int, int], dict[int, list[tuple[float, tuple[int, int], float, bool]]]] = {}
-        actions = (Action.WAIT, *MOVEMENT_ACTIONS)
         for row in range(state.height):
             for column in range(state.width):
                 position = (row, column)
                 if position in state.walls:
                     continue
                 model[position] = {}
-                for action in actions:
+                source = template.copy()
+                factory = source.factory(0)
+                assert factory is not None
+                factory.position = position
+                mask = action_mask(source, self.config)
+                for action in Action:
+                    if position == goal:
+                        model[position][int(action)] = [(1.0, position, 0.0, True)]
+                        continue
+                    invalid = not bool(mask[int(action)])
+                    requested = Action.WAIT if invalid else action
                     outcomes: dict[tuple[tuple[int, int], float, bool], float] = {}
-                    for realized, probability in movement_distribution(action, self.config.slip_probability).items():
-                        trial = state.copy()
-                        trial.step_count = 0
-                        trial.terminated = False
-                        trial.winner = None
-                        factory = trial.factory(0)
-                        assert factory is not None
-                        factory.position = position
+                    for realized, probability in movement_distribution(requested, self.config.slip_probability).items():
+                        if probability == 0:
+                            continue
+                        trial = source.copy()
                         before = trial.copy()
-                        deterministic = self.config.with_overrides(slip_probability=0.0)
-                        RuleEngine(deterministic, self.rule_engine.extra_rules).apply_actions(
-                            trial, {0: realized}, np.random.default_rng(0)
-                        )
-                        reward, _ = self.reward_system.calculate(RewardContext(before, trial, 0))
+                        engine.apply_actions(trial, {0: realized}, np.random.default_rng(0))
+                        reward, _ = self.reward_system.calculate(RewardContext(before, trial, 0, invalid))
                         next_factory = trial.factory(0)
                         next_position = next_factory.position if next_factory else position
                         key = (next_position, reward, trial.terminated)

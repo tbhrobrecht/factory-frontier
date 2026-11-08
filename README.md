@@ -102,6 +102,28 @@ All presets use `FactoryFrontier`; only configuration changes.
 
 Model-based stages expose `env.transition_model()`, a mapping from state and action to `(probability, next_state, reward, terminal)` outcomes. Later stages intentionally reject access to it.
 
+For `mdp` and `dynamic_programming`, states are `(row, column)` positions.
+Call `reset()` before requesting the model. Every canonical action index is
+included: unavailable actions and moves into walls or outside the map behave
+as `WAIT`, without slipping. Legal movement keeps its requested direction with
+probability `1 - slip_probability`, or takes each other direction with
+probability `slip_probability / 3`; a blocked realized direction stays in place.
+Use `action_mask` when selecting legal actions in the running environment.
+
+The top-right goal is an absorbing model state with zero subsequent reward.
+Entering it earns the configured win reward once, plus the usual step reward.
+The model describes stationary dynamics; its terminal flag does not include
+the external time limit (`50` steps for these presets). The live environment
+reports that limit through `truncated`, separately from `terminated`. For a
+finite-horizon planning exercise, track remaining steps in the planner. After
+either episode-ending flag, call `reset()` before stepping again.
+
+Model queries leave episode state and random draws unchanged and work after an
+episode ends. Position-only models reject overrides adding resources, danger,
+opponents, energy costs, advanced actions, or rule hooks. Custom reward
+components must also be stationary functions of position/action rather than
+episode history for this state representation to be valid.
+
 ## Instructor extension guide
 
 Create a variation without changing the engine:
