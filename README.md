@@ -182,6 +182,15 @@ Extension points are intentionally small:
 
 `training.run_training_episode` is a minimal algorithm-neutral learning loop. `evaluation.evaluate_agent` reports returns, episode lengths, and successes over explicit seeds.
 
+The `monte_carlo_td` preset is a fully observable 6×6 movement task with 10%
+slip, no exposed transition model, and a 75-step external time limit. Training
+updates receive `(observation, action, reward, next_observation, terminated,
+truncated)` so students can implement episode-based MC or step-based TD without
+losing the reason an episode stopped. Both ending flags stop the rollout;
+only true termination forces a zero bootstrap value for the underlying task.
+See `student/README.md` for buffer handling. Learning algorithms remain student
+exercises.
+
 ```python
 from factory_frontier.agents import RandomAgent, RuleBasedAgent
 from factory_frontier.competition import round_robin

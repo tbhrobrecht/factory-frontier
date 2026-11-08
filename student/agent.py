@@ -28,6 +28,12 @@ class StudentAgent(Agent):
         action: int,
         reward: float,
         next_observation: Observation,
-        done: bool,
+        terminated: bool,
+        truncated: bool = False,
     ) -> None:
-        """Learn from one transition; intentionally empty in the starter agent."""
+        """Learn from a transition; finish episode buffers on either ending flag.
+
+        TD methods stop bootstrapping on termination. A time-limit truncation
+        retains a valid next observation for bootstrapping. Intentionally empty
+        until students implement their assigned learning algorithm.
+        """

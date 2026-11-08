@@ -68,6 +68,16 @@ random baseline rather than learning. Implement the assigned algorithm inside
 `StudentAgent` or additional modules, then save checkpoints under
 `student/checkpoints/`.
 
+Both training loops call
+`update(observation, action, reward, next_observation, terminated, truncated)`.
+Use `terminated or truncated`
+to finish an episode buffer. For TD learning, suppress the next-state value
+only on `terminated`; a time limit still supplies a next observation to bootstrap
+from. For Monte Carlo learning, accumulate transitions until either ending flag
+and compute returns backward before the next `reset()`. A truncated trajectory
+is a partial episode: collect complete episodes for pure episodic MC, or explicitly
+choose a tail-value estimate or a finite-horizon objective for truncated data.
+
 ## Course progression
 
 The same student interface works with every curriculum preset:

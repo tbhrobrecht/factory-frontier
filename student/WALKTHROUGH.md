@@ -293,7 +293,7 @@ inside this method or in additional modules.
 The transition passed to `update()` is:
 
 ```text
-(observation, action, reward, next_observation, done)
+(observation, action, reward, next_observation, terminated, truncated)
 ```
 
 ### Practice
@@ -305,7 +305,7 @@ def __init__(self, seed: int | None = None) -> None:
     self.rng = np.random.default_rng(seed)
     self.transitions_seen = 0
 
-def update(self, observation, action, reward, next_observation, done) -> None:
+def update(self, observation, action, reward, next_observation, terminated, truncated=False) -> None:
     self.transitions_seen += 1
 ```
 

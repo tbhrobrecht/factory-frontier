@@ -36,12 +36,15 @@ class TabularQAgent(Agent):
         masked[legal] = values[legal]
         return int(np.argmax(masked))
 
-    def update(self, observation: Observation, action: int, reward: float, next_observation: Observation, done: bool) -> None:
+    def update(self, observation: Observation, action: int, reward: float, next_observation: Observation,
+               terminated: bool, truncated: bool = False) -> None:
         key = self.state_key(observation)
         next_key = self.state_key(next_observation)
         values = self.q.setdefault(key, np.zeros(ACTION_COUNT))
         next_values = self.q.setdefault(next_key, np.zeros(ACTION_COUNT))
-        target = reward if done else reward + 0.99 * float(np.max(next_values))
+        legal = np.flatnonzero(next_observation["action_mask"])
+        bootstrap = float(np.max(next_values[legal])) if not terminated and len(legal) else 0.0
+        target = reward + 0.99 * bootstrap
         values[action] += self.learning_rate * (target - values[action])
 
     def save(self, path: str | Path) -> None:

@@ -31,7 +31,7 @@ def run_episode(env: FactoryFrontier, agent: StudentAgent, seed: int) -> tuple[f
         action = agent.act(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
-        agent.update(observation, action, reward, next_observation, done)
+        agent.update(observation, action, reward, next_observation, terminated, truncated)
         observation = next_observation
         total_reward += reward
     return total_reward, info.get("winner") == 0
