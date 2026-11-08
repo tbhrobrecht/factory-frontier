@@ -105,6 +105,17 @@ policies. Implement differentiable log-probabilities and entropy in your chosen
 framework; the NumPy helper is for action sampling and experimentation. See the
 root README for a runnable example and episode/actor-critic guidance.
 
+For `ppo`, use the same helpers with local observations on room maps. Compare
+feed-forward models with observation/action histories or recurrent policies.
+Store original action masks, selected actions, old log-probabilities, value
+predictions and episode-ending flags in rollout buffers. Reuse the stored mask
+when computing PPO probability ratios, and keep gradient computations in your
+framework. Do not reset a live environment solely because a rollout batch is
+full. At episode boundaries, reset recurrent memory but keep training data until
+its batch is processed. See the root README for bootstrap and advantage-boundary
+rules; `StudentAgent.update()` remains the place to implement rollout collection
+and optimization. The full-map renderer is for debugging, not policy input.
+
 The same student interface works with every curriculum preset:
 
 ```powershell

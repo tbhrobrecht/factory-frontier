@@ -25,13 +25,14 @@ Resources help you earn reward and replenish energy. Movement, jumps, and
 building can spend energy, so choose routes and builds that support the goal.
 Zero energy does not itself destroy the factory, but it can prevent actions.
 
-Except for `model_free_control`, `function_approximation` and `policy_methods`,
-built-in presets reward each step with `-0.01`, each gathered resource unit with
+The navigation/refuelling presets are `model_free_control`,
+`function_approximation`, `policy_methods` and `ppo`. Other built-in presets
+reward each step with `-0.01`, each gathered resource unit with
 `+1`, a win with `+10`, and a loss with `-10`. These rewards guide learning; they
 are separate from the competition score above. Custom configurations can change
 the weights.
 
-Those three navigation/refuelling presets use `-0.1` per step and `+0.05` per
+Those four navigation/refuelling presets use `-0.1` per step and `+0.05` per
 resource, with the same win/loss rewards. Mining earns a net `-0.05` per turn,
 so refuel when needed rather than mining for points.
 
@@ -65,10 +66,10 @@ Destroyed entities disappear from the map.
 column. Read `observation["danger"]` to track the boundary.
 
 When enabled, danger advances every `boundary_interval` turns (six in
-`policy_methods`, five in the other built-in presets). The boundary starts at
+`policy_methods`, eight in `ppo`, five in the other built-in presets). The boundary starts at
 column `-1`; its first advance covers column `0`. At the end of every turn,
-living entities in covered columns are
-destroyed, including those entering an already-covered column. Walls do not
+living entities in covered columns are destroyed, including those entering an
+already-covered column. Walls do not
 protect them. Danger is resolved before goal detection.
 
 - In single-player, covered columns satisfy `column <= danger_column`:
@@ -133,8 +134,9 @@ Movement and other legal actions remain available during that cooldown.
 
 In `model_free_control`, factories start with 8 energy and movement costs 1.
 In `function_approximation` and `policy_methods`, they start with 16 energy,
-movement costs 1, and jumps cost 2. Other presets start with 20 energy; movement is free in early
-presets and costs 0.1 in `ppo` and `competition`. Jumps cost 2.
+movement costs 1, and jumps cost 2. In `ppo`, factories start with 20 energy,
+movement costs 1, and jumps cost 2. Other presets start with 20 energy; movement
+is free in early presets and costs 0.1 in `competition`. Jumps cost 2.
 These costs and build settings can be overridden in custom configurations.
 
 The default `model_free_control` map guarantees a mining node at `(7, 3)`,
@@ -161,6 +163,15 @@ slips can still cause a loss. Use a stochastic policy to experiment with policy
 gradients or actor-critic methods; the agent's sampling and the environment's
 slips use separate random generators.
 
+`ppo` uses four-room 14 by 14 layouts with doorways, local observations within
+Manhattan distance 3, 20 collectibles, and a reachable mining node at `(13, 3)`.
+Doorways and a route to the goal are protected from random obstacles. Ordinary
+moves have 5% slip; jumps, mining and waiting do not slip. Danger advances every
+eight turns and covers the map at the 112-step deadline. Navigation, jumps and
+mining are enabled; building and wall removal are unavailable. Learn from the
+masked observation, optionally with memory, rather than reading the full debug
+map. The PPO algorithm itself is a student exercise.
+
 ## Which mechanics appear in each preset?
 
 | Preset | What to focus on |
@@ -171,7 +182,7 @@ slips use separate random generators.
 | `model_free_control` | Random walls, resources, mining, energy costs, and advancing danger; builds and jumps are unavailable. |
 | `function_approximation` | Larger solvable map, meaningful fuel costs, and jumps; building and wall removal are unavailable. |
 | `policy_methods` | Stochastic navigation and refuelling, jumps, and a 72-step deadline; building and wall removal are unavailable. |
-| `ppo` | All actions, stochastic movement, and partial observability. |
+| `ppo` | Room maps, doorways, fuel, jumps, stochastic movement, and local observations; building and wall removal are unavailable. |
 | `competition` | Two factories acting simultaneously, partial observability, and danger from both sides. |
 
 For example, run `python -m student.student_view --config function_approximation`

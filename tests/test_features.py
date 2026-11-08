@@ -38,6 +38,7 @@ def test_value_mask_excludes_illegal_outputs_without_mutating_them():
 
 @pytest.mark.parametrize("preset,slip,deadline", [
     ("function_approximation", 0.0, 60), ("policy_methods", 0.08, 72),
+    ("ppo", 0.05, 112),
 ])
 def test_approximation_presets_expose_jumps_without_unfinished_builds(preset, slip, deadline):
     env = FactoryFrontier(preset)
@@ -47,8 +48,8 @@ def test_approximation_presets_expose_jumps_without_unfinished_builds(preset, sl
     assert not observation["action_mask"][Action.BUILD_SCOUT:Action.REMOVE_WALL + 1].any()
     assert observation["action_mask"][Action.JUMP_EAST]
     env.step(Action.JUMP_EAST)
-    assert env.state.factory(0).position == (11, 2)
-    assert env.state.factory(0).energy == 16 - 2 + env.state.gathered[0]
+    assert env.state.factory(0).position == (env.config.height - 1, 2)
+    assert env.state.factory(0).energy == env.config.initial_energy - 2 + env.state.gathered[0]
 
 
 def test_masked_policy_is_stable_and_excludes_illegal_actions():

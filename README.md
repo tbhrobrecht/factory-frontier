@@ -98,7 +98,7 @@ All presets use `FactoryFrontier`; only configuration changes.
 | `model_free_control` | random map, energy, resources, danger |
 | `function_approximation` | larger solvable layouts, fuel management, and jumps |
 | `policy_methods` | stochastic navigation, fuel management, and masked policies |
-| `ppo` | rooms, cooldowns, entities, partial observability |
+| `ppo` | connected room layouts, local observations, and masked policy experiments |
 | `competition` | symmetric maps and simultaneous two-agent play |
 
 Model-based stages expose `env.transition_model()`, a mapping from state and action to `(probability, next_state, reward, terminal)` outcomes. Later stages intentionally reject access to it.
@@ -261,6 +261,61 @@ in `student/`, and compare multiple environment and agent seeds.
 python -m student.student_view --config policy_methods
 python -m student.train --config policy_methods --episodes 100
 python -m student.evaluate --config policy_methods --seeds 100 101 102 --agent-seed 7
+```
+
+### PPO exercises
+
+`ppo` is a 14×14 partially observable navigation/refuelling task with four rooms.
+Two partition walls have randomized doorways; additional interior obstacles
+fill the requested wall-density target when the partitions do not already exceed
+it. Door approaches, an early mining stop at `(13, 3)`, and a monotone route to
+`(0, 13)` are protected. The room generator requires dimensions of at least 8×8.
+Default layouts have a feasible ordinary-movement route; slip and poor decisions
+can still cause failure. Jumps can cross a partition if their landing cell is free.
+
+The factory starts with 20 energy; moves cost 1, jumps cost 2. There are 20
+collectibles, 5% slip on ordinary moves, and the same balanced rewards as
+`policy_methods`. Danger advances every eight turns and covers the map at the
+112-step cap. Building and wall removal are disabled. The goal and loss rules
+are unchanged, and the transition model is hidden.
+
+Only cells within Manhattan distance 3 of the factory are visible. Walls do not
+block this radius-based visibility. The grid, mining-node layer and entity
+features hide off-screen contents; `visibility` distinguishes unseen/padded
+cells from observed empty ground. Action masks describe current legal choices;
+two-cell jump destinations are inside the visible radius. The full-map ASCII
+renderer and `env.state` are debugging tools, not agent inputs.
+
+`encode_features` and `masked_policy_probabilities` work with this preset without
+changing dimensions. Begin with a feed-forward policy; compare it with a history
+of observations/actions or a recurrent policy to investigate memory. PPO does
+not require a recurrent architecture. Manage recurrent hidden state in your
+agent; the generic `ModelAdapter` does not manage it. For a controlled comparison, use
+`FactoryFrontier("ppo", partial_observability=False)` with the same map seeds.
+
+Implement PPO inside the student workspace. When collecting rollouts, keep each
+observation, its original action mask, selected action, old log-probability,
+value prediction, reward, both ending flags, and the actual next observation.
+Recompute new log-probabilities under the same stored mask during optimization;
+do not replace old log-probabilities after an update, and do not use the direction
+realized after slip as the selected action. Tensor computations for the clipped
+objective, value loss and entropy must stay inside the learning framework.
+
+For advantage estimates, bootstrap the next-state value unless `terminated` is
+true. Stop advantage recursion across either termination or truncation so it
+never crosses into another episode. At a rollout-length cutoff, bootstrap the
+last next observation without resetting a still-active environment. At external
+time-limit truncation, use the final next observation before resetting. Reset
+recurrent episode memory on either episode-ending flag; training rollout buffers
+may span episodes but must retain those boundaries. Keep recurrent sequences
+ordered if using memory. Save any feature scaling and model state in checkpoints.
+The generic training loop supplies individual transitions; students implement
+rollout batching, advantage calculation and PPO optimization themselves.
+
+```powershell
+python -m student.student_view --config ppo
+python -m student.train --config ppo --episodes 100
+python -m student.evaluate --config ppo --seeds 100 101 102 --agent-seed 7
 ```
 
 ### Dynamic programming exercises

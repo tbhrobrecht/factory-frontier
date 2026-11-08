@@ -115,8 +115,8 @@ def test_config_switching_changes_rules_not_interfaces() -> None:
     second, _ = advanced.reset(seed=1)
     assert first.keys() == second.keys()
     assert first["grid"].shape == second["grid"].shape
-    assert first["action_mask"][Action.BUILD_SCOUT] == 0
-    assert second["action_mask"][Action.BUILD_SCOUT] == 1
+    assert first["action_mask"][Action.JUMP_EAST] == 0
+    assert second["action_mask"][Action.JUMP_EAST] == 1
 
 
 def test_custom_rule_and_reward_are_injectable() -> None:
