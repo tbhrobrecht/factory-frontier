@@ -22,6 +22,8 @@ class TrainingSummary:
 
 
 def run_episode(env: FactoryFrontier, agent: StudentAgent, seed: int) -> tuple[float, bool]:
+    if env.config.opponent_enabled:
+        raise ValueError("Use play_match(..., training_owners=...) for two-agent training")
     observation, _ = env.reset(seed=seed)
     agent.reset(observation)
     total_reward = 0.0

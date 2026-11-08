@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from factory_frontier.agents.base import Agent
+from factory_frontier.configs import CurriculumConfig
 from factory_frontier.core.environment import FactoryFrontier
 
 
@@ -33,6 +34,10 @@ class MatchResult:
     energy_spent: tuple[float, float]
     factory_progress: tuple[int, int]
     events: tuple[dict[str, object], ...]
+    players: tuple[str, str]
+    scores: tuple[tuple[int, int, float], tuple[int, int, float]]
+    end_reason: str
+    settings: dict[str, Any]
 
     def save_replay(self, path: str | Path) -> None:
         Path(path).write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
@@ -42,9 +47,28 @@ def play_match(
     first: Agent,
     second: Agent,
     seed: int = 0,
-    config: str = "competition",
+    config: str | CurriculumConfig = "competition",
     replay_path: str | Path | None = None,
+    training_owners: tuple[int, ...] = (),
+    player_names: tuple[str, str] | None = None,
 ) -> MatchResult:
+    """Play simultaneous turns; optionally update selected learning agents.
+
+    Evaluation is the default. Use separate agent instances for per-seat memory,
+    even when they deliberately share model weights. Updates receive the chosen
+    action and both ending flags, never the opponent's private observation.
+    """
+    agents = (first, second)
+    if first is second:
+        raise ValueError("Use separate agent instances for the two seats")
+    if not set(training_owners) <= {0, 1}:
+        raise ValueError("Training owners must be 0 and/or 1")
+    updates = {}
+    for owner in sorted(set(training_owners)):
+        update = getattr(agents[owner], "update", None)
+        if not callable(update):
+            raise TypeError(f"Training agent {owner} must implement update()")
+        updates[owner] = update
     env = FactoryFrontier(config)
     if not env.config.opponent_enabled:
         raise ValueError("Competition matches require opponent_enabled=True")
@@ -57,7 +81,13 @@ def play_match(
     second.reset(second_observation)
     done = False
     while not done:
-        outputs = env.step_multi({0: first.act(first_observation), 1: second.act(second_observation)})
+        observations = (first_observation, second_observation)
+        actions = {owner: agent.act(observations[owner]) for owner, agent in enumerate(agents)}
+        outputs = env.step_multi(actions)
+        # Both actions are collected before either learner is updated.
+        for owner, update in updates.items():
+            next_observation, reward, terminated, truncated, _ = outputs[owner]
+            update(observations[owner], actions[owner], reward, next_observation, terminated, truncated)
         first_observation, _, terminated, truncated, _ = outputs[0]
         second_observation = outputs[1][0]
         done = terminated or truncated
@@ -72,6 +102,7 @@ def play_match(
             progress.append(factory.position[1] + (state.height - 1 - factory.position[0]))
         else:
             progress.append((state.width - 1 - factory.position[1]) + factory.position[0])
+    scores = env._competition_scores(state)
     result = MatchResult(
         config=env.config.name,
         seed=seed,
@@ -81,6 +112,10 @@ def play_match(
         energy_spent=(state.energy_spent[0], state.energy_spent[1]),
         factory_progress=(progress[0], progress[1]),
         events=tuple(_json_safe_event(event) for event in state.event_log),
+        players=player_names if player_names is not None else (type(first).__name__, type(second).__name__),
+        scores=(scores[0], scores[1]),
+        end_reason="score" if all(state.factory(owner) is not None for owner in (0, 1)) else "survival",
+        settings=asdict(env.config),
     )
     if replay_path is not None:
         result.save_replay(replay_path)

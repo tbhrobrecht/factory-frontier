@@ -116,6 +116,16 @@ its batch is processed. See the root README for bootstrap and advantage-boundary
 rules; `StudentAgent.update()` remains the place to implement rollout collection
 and optimization. The full-map renderer is for debugging, not policy input.
 
+For `competition`, use `play_match` or `round_robin` from
+`factory_frontier.competition`, rather than the single-player training/evaluation
+commands. `play_match(learner, opponent, training_owners=(0,))` trains only the
+first player; `(0, 1)` trains both. Use separate agent instances and preserve
+learned parameters across calls. Tournament factories should load the desired
+checkpoint into a fresh agent, and evaluation performs no updates. The supplied
+`SurvivalAgent` baseline escapes to the middle from either spawn. Actions and
+coordinates remain absolute, so a policy must handle both seats. See the root
+README for scoring, replay metadata and runnable training/tournament examples.
+
 The same student interface works with every curriculum preset:
 
 ```powershell

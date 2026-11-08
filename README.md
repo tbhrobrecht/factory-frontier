@@ -99,7 +99,7 @@ All presets use `FactoryFrontier`; only configuration changes.
 | `function_approximation` | larger solvable layouts, fuel management, and jumps |
 | `policy_methods` | stochastic navigation, fuel management, and masked policies |
 | `ppo` | connected room layouts, local observations, and masked policy experiments |
-| `competition` | symmetric maps and simultaneous two-agent play |
+| `competition` | mirrored survival/resource contests with simultaneous turns and terminal scoring |
 
 Model-based stages expose `env.transition_model()`, a mapping from state and action to `(probability, next_state, reward, terminal)` outcomes. Later stages intentionally reject access to it.
 
@@ -386,16 +386,88 @@ See `student/README.md` for buffer handling. Learning algorithms remain student
 exercises.
 
 ```python
-from factory_frontier.agents import RandomAgent, RuleBasedAgent
+from factory_frontier.agents import RandomAgent, SurvivalAgent
 from factory_frontier.competition import round_robin
 
 leaderboard, matches = round_robin(
-    {"student_a": RandomAgent(seed=1), "student_b": RuleBasedAgent()},
+    {"random": lambda: RandomAgent(seed=1), "survival": SurvivalAgent},
     seeds=(10, 11, 12),
 )
 ```
 
-Tournament pairs play both seat assignments on every seed. Results include win/loss/draw, survival steps, progress, gathered resources, energy spent, and the engine event log. Call `MatchResult.save_replay(path)` or pass `replay_path` to `play_match` for JSON replay data; `render_replay` deterministically reconstructs ASCII frames. Matches call the same engine's simultaneous `step_multi`; there is no separate competition game.
+Tournament pairs play both seat assignments on every seed. Factories create
+fresh agents for each match; load trained checkpoints in those factories when
+evaluating learned policies. Agent instances are also accepted, but their
+`reset()` must restore episode/RNG state for repeatable evaluation. The supplied
+seeded `RandomAgent` does this. Both seats require separate instances, including
+for policies that deliberately share model weights.
+
+### Competition rules and training
+
+Competition is a survival/resource contest on a 16×16 map, with no combat or
+unit building. Walls, 24 collectibles and mining nodes are mirrored by 180-degree
+rotation. Protected escape lanes and clear central columns connect both spawn
+corners; every collectible is placed in their shared reachable component.
+Mining stops at `(15, 3)` and `(0, 12)` are paired. The symmetric generator
+requires even dimensions (width at least 8, height at least 4) and an even resource
+count; wall counts round down to whole mirrored pairs.
+
+Factories start with 16 energy. Moves cost 1, jumps cost 2, and ordinary moves
+have 5% slip. Mining adds 1 energy but **no resource points**. Collecting a finite
+resource adds 1 energy and 1 resource point. Danger advances from both sides
+every eight turns. At the 60-turn deadline, central columns 7 and 8 remain safe.
+One surviving factory wins immediately; simultaneous factory loss is a draw.
+If both survive to the deadline, compare `(alive, collected_resources, energy)`
+lexicographically: a resource point beats any energy difference, and equal
+scores draw. The deadline is true termination, so final win/loss rewards are
+delivered and learners do not bootstrap beyond the round.
+
+Rewards are `-0.1` per turn, `+0.05` per collectible, `+10` for a win and `-10`
+for a loss. Losing your factory also costs `-10`, including on a double-death
+draw, so dying together early is not rewarded over surviving. Mining has net
+reward `-0.1`. Terminal scores decide tournament results independently of reward.
+
+Actions use the same pre-turn state: occupied starting cells cannot be entered,
+and same-destination movement/build conflicts cancel without energy costs.
+Removing the same wall twice removes only that wall. Building/removal actions
+are disabled in the default contest, but custom overrides use the same conflict
+rules with mirrored adjacency preferences. Observations have visibility radius
+4 and relative friendly/enemy codes; coordinates and action names are absolute.
+Each player receives only its own events in partial-observation `info`. The
+full event log is reserved for match results and debugging after play.
+
+Use the two-agent loop for learning, rather than the single-player commands:
+
+```python
+from student.agent import StudentAgent
+from factory_frontier.agents import SurvivalAgent
+from factory_frontier.competition import play_match
+
+learner = StudentAgent(seed=0)
+for seed in range(100):
+    result = play_match(learner, SurvivalAgent(), seed=seed, training_owners=(0,))
+```
+
+Use `training_owners=(0, 1)` to update both learners. Each update receives its
+own pre-turn observation, selected action, reward, next observation, termination
+and truncation flags. Both actions are selected before updates; frozen opponents
+receive no updates. Keep learned parameters between matches and reset only
+episode memory. Evaluation defaults to no learning. The low-level Gym `step()`
+is a debug convenience against a waiting opponent; real contests use
+`step_multi()` or `play_match()`. Single-player training/evaluation helpers reject
+competition configs to avoid silently using a waiting opponent.
+
+Results include player names/seats, outcome, final score tuples, end reason,
+progress, resources, energy spent, full events and a configuration snapshot.
+Call `result.save_replay(path)` or pass `replay_path` to `play_match` for JSON;
+`render_replay` reconstructs frames using the saved settings, including custom
+configurations. The leaderboard awards 3 points for a win and 1 for a draw,
+then orders ties by wins, gathered resources and name. Algorithms, checkpoint
+loading and student strategy remain in `student/`.
+
+```powershell
+python -m factory_frontier.examples.tournament
+```
 
 For submission, provide the `student/` directory, including an importable
 `StudentAgent` implementation and any required checkpoint files. Grading should

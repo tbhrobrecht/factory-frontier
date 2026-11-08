@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 
 from factory_frontier.configs.presets import CurriculumConfig
@@ -53,11 +55,56 @@ def _room_layout(
     return walls, protected
 
 
+def _symmetric_map(
+    config: CurriculumConfig, rng: np.random.Generator,
+) -> tuple[set[tuple[int, int]], dict[tuple[int, int], int], set[tuple[int, int]]]:
+    """Paired terrain and fuel, with escape lanes into a shared central arena."""
+    width, height = config.width, config.height
+    count = config.resource_count if config.resources_enabled else 0
+    if width < 8 or height < 4 or width % 2 or height % 2 or count % 2:
+        raise ValueError("Symmetric maps need even dimensions (width >= 8, height >= 4) and an even resource count")
+
+    def mirror(cell):
+        return height - 1 - cell[0], width - 1 - cell[1]
+
+    def pair(cell):
+        return tuple(sorted((cell, mirror(cell))))
+
+    center = (width // 2 - 1, width // 2)
+    protected = {(r, c) for r in range(height) for c in center}
+    escape = {(height - 1, c) for c in range(width // 2)}
+    protected |= escape | {mirror(cell) for cell in escape}
+    pairs = [pair(cell) for cell in _candidates(config) if cell < mirror(cell)]
+    rng.shuffle(pairs)
+    wall_pairs = [p for p in pairs if not protected.intersection(p)]
+    walls = {cell for p in wall_pairs[:max(0, int(width * height * config.wall_density) // 2)] for cell in p}
+    # Resources are placed only in the component shared by both spawn corners.
+    reachable, queue = {(height - 1, 0)}, deque([(height - 1, 0)])
+    while queue:
+        r, c = queue.popleft()
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            cell = r + dr, c + dc
+            if 0 <= cell[0] < height and 0 <= cell[1] < width and cell not in walls and cell not in reachable:
+                reachable.add(cell)
+                queue.append(cell)
+    available = [p for p in pairs if set(p) <= reachable]
+    priority = [pair((height - 1, min(3, center[0] - 1))), pair((height // 2 - 1, center[0]))]
+    available = priority + [p for p in available if p not in priority]
+    if count // 2 > len(available):
+        raise ValueError("Not enough reachable mirrored cells for the requested resources")
+    selected = available[:count // 2]
+    resources = {cell: 1 for p in selected for cell in p}
+    nodes = {cell for p in selected[::4] if p[0][1] not in center for cell in p}
+    return walls, resources, nodes
+
+
 def generate_map(
     config: CurriculumConfig, rng: np.random.Generator
 ) -> tuple[set[tuple[int, int]], dict[tuple[int, int], int], set[tuple[int, int]]]:
     """Return walls, collectible resources and renewable mining nodes."""
 
+    if config.map_generator == "symmetric":
+        return _symmetric_map(config, rng)
     cells = _candidates(config)
     route: set[tuple[int, int]] = set()
     room_walls: set[tuple[int, int]] = set()
@@ -83,27 +130,12 @@ def generate_map(
         wall_count = 0
     candidates = [cell for cell in cells if cell not in route and cell not in room_walls]
     walls = room_walls | set(candidates[:max(0, wall_count - len(room_walls))])
-    if config.map_generator == "symmetric":
-        reflected = {(config.height - 1 - r, config.width - 1 - c) for r, c in walls}
-        walls |= reflected
-        # Never seal the two spawn corners.
-        walls -= {(config.height - 1, 0), (0, config.width - 1)}
     available = [cell for cell in cells if cell not in walls]
     rng.shuffle(available)
     count = min(config.resource_count if config.resources_enabled else 0, len(available))
     if config.map_generator in ("control", "rooms") and count:
         available = [fuel, *(cell for cell in available if cell != fuel)]
-    if config.map_generator == "symmetric":
-        selected: set[tuple[int, int]] = set()
-        for cell in available:
-            mirror = (config.height - 1 - cell[0], config.width - 1 - cell[1])
-            if mirror not in walls:
-                selected.update((cell, mirror))
-            if len(selected) >= count:
-                break
-        resource_cells = sorted(selected)[:count]
-    else:
-        resource_cells = available[:count]
+    resource_cells = available[:count]
     resources = {cell: 1 for cell in resource_cells}
     nodes = set(resource_cells[::4])
     return walls, resources, nodes

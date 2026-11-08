@@ -116,9 +116,11 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
             raise ValueError(f"Expected actions for owners {sorted(expected)}, got {sorted(actions)}")
         before = state.copy()
         invalid = self.rule_engine.apply_actions(state, actions, self.np_random)
-        truncated = state.step_count >= self.config.max_steps and not state.terminated
-        if truncated and self.config.opponent_enabled:
+        if state.step_count >= self.config.max_steps and not state.terminated and self.config.opponent_enabled:
             state.winner = self._score_winner(state)
+            state.terminated = True
+            state.log("match_end", reason="score", winner=state.winner)
+        truncated = state.step_count >= self.config.max_steps and not state.terminated
         self._episode_done = state.terminated or truncated
         output = {}
         for owner in sorted(actions):
@@ -134,15 +136,17 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
             )
         return output
 
-    def _score_winner(self, state: GameState) -> int | None:
+    def _competition_scores(self, state: GameState) -> dict[int, tuple[int, int, float]]:
         scores = {}
         for owner in (0, 1):
             factory = state.factory(owner)
             scores[owner] = (
-                int(factory is not None) * 1000
-                + state.gathered[owner] * 10
-                + (factory.energy if factory else 0.0)
+                int(factory is not None), state.gathered[owner], factory.energy if factory else 0.0
             )
+        return scores
+
+    def _score_winner(self, state: GameState) -> int | None:
+        scores = self._competition_scores(state)
         return 0 if scores[0] > scores[1] else 1 if scores[1] > scores[0] else None
 
     def _info(self, owner: int, **extra: Any) -> dict[str, Any]:
@@ -156,7 +160,8 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
             "resources_gathered": state.gathered[owner],
             "energy_spent": state.energy_spent[owner],
             "factory_alive": factory is not None,
-            "events": [dict(event) for event in state.event_log],
+            "events": [dict(event) for event in state.event_log
+                       if not self.config.partial_observability or event.get("owner") == owner],
             **extra,
         }
 

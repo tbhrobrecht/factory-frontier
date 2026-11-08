@@ -34,9 +34,10 @@ def test_competition_is_reproducible() -> None:
 
 def test_round_robin_plays_both_seats() -> None:
     board, matches = round_robin(
-        {"a": RandomAgent(seed=1), "b": RandomAgent(seed=2)}, seeds=(7,)
+        {"a": lambda: RandomAgent(seed=1), "b": lambda: RandomAgent(seed=2)}, seeds=(7,)
     )
     assert len(matches) == 2
+    assert {result.players for result in matches} == {("a", "b"), ("b", "a")}
     assert all(entry.played == 2 for entry in board)
     assert all(entry.wins + entry.losses + entry.draws == 2 for entry in board)
 

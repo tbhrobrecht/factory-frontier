@@ -28,6 +28,7 @@ class CurriculumConfig:
     initial_energy: float = 20.0
     movement_cost: float = 0.0
     jump_cost: float = 2.0
+    mining_counts_as_resource: bool = True
     build_costs: dict[Action, float] = field(
         default_factory=lambda: {
             Action.BUILD_SCOUT: 4.0,
@@ -54,7 +55,6 @@ class CurriculumConfig:
 
 
 _MOVE = (Action.WAIT, *MOVEMENT_ACTIONS)
-_RICH = (*_MOVE, *tuple(Action)[5:])
 
 PRESETS: dict[str, CurriculumConfig] = {
     "intro": CurriculumConfig("intro", max_steps=40),
@@ -95,10 +95,13 @@ PRESETS: dict[str, CurriculumConfig] = {
         reward_weights={"time": -0.1, "resource": 0.05, "win": 10.0, "loss": -10.0},
     ),
     "competition": CurriculumConfig(
-        "competition", width=16, height=16, map_generator="symmetric", enabled_actions=_RICH,
+        "competition", width=16, height=16, map_generator="symmetric",
+        enabled_actions=(*_MOVE, *JUMP_ACTIONS, Action.MINE),
         slip_probability=0.05, resources_enabled=True, opponent_enabled=True, danger_enabled=True,
         partial_observability=True, visibility_radius=4, resource_count=24, wall_density=0.12,
-        movement_cost=0.1, max_steps=400,
+        initial_energy=16.0, movement_cost=1.0, jump_cost=2.0,
+        mining_counts_as_resource=False, boundary_interval=8, max_steps=60,
+        reward_weights={"time": -0.1, "resource": 0.05, "win": 10.0, "loss": -10.0, "unit_loss": 10.0},
     ),
 }
 

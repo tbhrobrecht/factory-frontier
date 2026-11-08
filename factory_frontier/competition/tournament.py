@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import combinations
+from collections.abc import Callable
 
 from factory_frontier.agents.base import Agent
 from factory_frontier.competition.match import MatchResult, play_match
+from factory_frontier.configs import CurriculumConfig
 
 
 @dataclass(slots=True)
@@ -26,16 +28,25 @@ class LeaderboardEntry:
 
 
 def round_robin(
-    agents: dict[str, Agent], seeds: tuple[int, ...] = (0, 1, 2, 3, 4), config: str = "competition"
+    agents: dict[str, Agent | Callable[[], Agent]], seeds: tuple[int, ...] = (0, 1, 2, 3, 4),
+    config: str | CurriculumConfig = "competition",
 ) -> tuple[list[LeaderboardEntry], list[MatchResult]]:
-    """Play both seat assignments for every pair and seed."""
+    """Play both seats per pair/seed; factories create fresh evaluation agents."""
+
+    def instantiate(name: str) -> Agent:
+        specification = agents[name]
+        agent = specification if isinstance(specification, Agent) else specification()
+        if not isinstance(agent, Agent):
+            raise TypeError(f"{name!r} must be an Agent or a factory returning an Agent")
+        return agent
 
     board = {name: LeaderboardEntry(name) for name in agents}
     matches: list[MatchResult] = []
     for first_name, second_name in combinations(sorted(agents), 2):
         for seed in seeds:
             for left_name, right_name in ((first_name, second_name), (second_name, first_name)):
-                result = play_match(agents[left_name], agents[right_name], seed=seed, config=config)
+                result = play_match(instantiate(left_name), instantiate(right_name), seed=seed, config=config,
+                                    player_names=(left_name, right_name))
                 matches.append(result)
                 left, right = board[left_name], board[right_name]
                 left.played += 1

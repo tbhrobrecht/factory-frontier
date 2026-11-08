@@ -16,6 +16,8 @@ class LearningAgent(Protocol):
 
 
 def run_training_episode(env: FactoryFrontier, agent: LearningAgent, seed: int | None = None) -> float:
+    if env.config.opponent_enabled:
+        raise ValueError("Use play_match(..., training_owners=...) for two-agent training")
     observation, _ = env.reset(seed=seed)
     agent.reset(observation)
     total = 0.0

@@ -27,6 +27,8 @@ def evaluate_agent(agent: Agent, config: str = "intro", seeds: tuple[int, ...] =
     successes = 0
     for seed in seeds:
         env = FactoryFrontier(config)
+        if env.config.opponent_enabled:
+            raise ValueError("Use play_match() or round_robin() for two-agent evaluation")
         observation, _ = env.reset(seed=seed)
         agent.reset(observation)
         total = 0.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Protocol
 
@@ -40,17 +41,18 @@ class RuleHook(Protocol):
     ) -> None: ...
 
 
-def adjacent_cells(state: GameState, position: tuple[int, int]) -> list[tuple[int, int]]:
+def adjacent_cells(state: GameState, position: tuple[int, int], owner: int = 0) -> list[tuple[int, int]]:
     """Return in-bounds neighboring cells in a stable preference order."""
 
     row, column = position
-    values = [(row, column + 1), (row + 1, column), (row, column - 1), (row - 1, column)]
+    sign = -1 if owner == 1 else 1
+    values = [(row, column + sign), (row + sign, column), (row, column - sign), (row - sign, column)]
     return [cell for cell in values if state.in_bounds(cell)]
 
 
-def first_free_adjacent(state: GameState, position: tuple[int, int]) -> tuple[int, int] | None:
+def first_free_adjacent(state: GameState, position: tuple[int, int], owner: int = 0) -> tuple[int, int] | None:
     return next(
-        (cell for cell in adjacent_cells(state, position) if cell not in state.walls and state.entity_at(cell) is None),
+        (cell for cell in adjacent_cells(state, position, owner) if cell not in state.walls and state.entity_at(cell) is None),
         None,
     )
 
@@ -76,7 +78,7 @@ def action_mask(state: GameState, config: CurriculumConfig, owner: int = 0) -> n
             or factory.energy < cost
         ):
             mask[int(action)] = 0
-    free = first_free_adjacent(state, factory.position)
+    free = first_free_adjacent(state, factory.position, owner)
     for action, cost in config.build_costs.items():
         if int(action) < ACTION_COUNT and mask[int(action)] and (
             factory.cooldown > 0 or factory.energy < cost or free is None
@@ -117,6 +119,7 @@ class RuleEngine:
     ) -> dict[int, bool]:
         if state.terminated:
             raise RuntimeError("Cannot step a terminated episode; call reset()")
+        actions = dict(sorted(actions.items()))
         for rule in self.extra_rules:
             rule.before_step(state, actions, self.config, rng)
         before_masks = {owner: action_mask(state, self.config, owner) for owner in actions}
@@ -144,7 +147,19 @@ class RuleEngine:
                 invalid=invalid[owner],
             )
 
-        # Resolve movement proposals together, so agent ordering has no effect.
+        # All spatial targets use the turn's starting state. Conflicting builds
+        # and moves cancel without spending energy, irrespective of input order.
+        targets: dict[int, tuple[int, int] | None] = {}
+        for owner, action in normalized.items():
+            factory = state.factory(owner)
+            if factory is None:
+                continue
+            if action in BUILD_TYPES or action == Action.BUILD_WALL:
+                targets[owner] = first_free_adjacent(state, factory.position, owner)
+            elif action == Action.REMOVE_WALL:
+                targets[owner] = next((cell for cell in adjacent_cells(state, factory.position, owner)
+                                       if cell in state.walls), None)
+
         proposals: dict[int, tuple[int, int]] = {}
         for owner, action in normalized.items():
             factory = state.factory(owner)
@@ -152,22 +167,16 @@ class RuleEngine:
                 delta = DELTAS[action]
                 destination = (factory.position[0] + delta[0], factory.position[1] + delta[1])
                 if state.in_bounds(destination) and destination not in state.walls:
-                    occupant = state.entity_at(destination)
-                    if occupant is None or occupant.owner in proposals:
+                    if state.entity_at(destination) is None:
                         proposals[owner] = destination
-        destinations = list(proposals.values())
+        claims = Counter(proposals.values())
+        claims.update(target for owner, target in targets.items() if target is not None
+                      and (normalized[owner] in BUILD_TYPES or normalized[owner] == Action.BUILD_WALL))
         for owner, destination in proposals.items():
             factory = state.factory(owner)
             assert factory is not None
-            # Same-cell collisions and swaps both leave participants in place.
-            duplicate = destinations.count(destination) > 1
-            other_origins = {
-                other_factory.position
-                for other_owner in proposals
-                if other_owner != owner and (other_factory := state.factory(other_owner)) is not None
-            }
-            swapping = destination in other_origins
-            if not duplicate and not swapping and state.entity_at(destination) is None:
+            # Occupied starting cells cannot be entered, even if vacated now.
+            if claims[destination] == 1:
                 action = normalized[owner]
                 cost = self.config.jump_cost if action in JUMP_ACTIONS else self.config.movement_cost
                 origin = factory.position
@@ -177,7 +186,11 @@ class RuleEngine:
 
         for owner, action in normalized.items():
             if action not in DELTAS and action != Action.WAIT:
-                self._apply_non_movement(state, owner, action)
+                target = targets.get(owner)
+                if (action in BUILD_TYPES or action == Action.BUILD_WALL) and claims[target] > 1:
+                    state.log("collision", owner=owner, position=target)
+                    continue
+                self._apply_non_movement(state, owner, action, target)
 
         self._collect_resources(state)
         self._advance_lifecycle(state)
@@ -192,12 +205,14 @@ class RuleEngine:
         factory.energy -= amount
         state.energy_spent[factory.owner] += amount
 
-    def _apply_non_movement(self, state: GameState, owner: int, action: Action) -> None:
+    def _apply_non_movement(
+        self, state: GameState, owner: int, action: Action, target: tuple[int, int] | None,
+    ) -> None:
         factory = state.factory(owner)
         if factory is None:
             return
         if action in BUILD_TYPES:
-            position = first_free_adjacent(state, factory.position)
+            position = target
             if position is None:
                 return
             entity = make_entity(state.next_entity_id, BUILD_TYPES[action], owner, position)
@@ -207,19 +222,19 @@ class RuleEngine:
             factory.cooldown = self.config.build_cooldown + 1
             state.log("build", owner=owner, entity=entity.id, kind=entity.kind.name, position=position)
         elif action == Action.BUILD_WALL:
-            position = first_free_adjacent(state, factory.position)
+            position = target
             if position is not None:
                 state.walls.add(position)
                 self._spend(state, factory, self.config.build_costs[action])
                 factory.cooldown = self.config.build_cooldown + 1
                 state.log("build_wall", owner=owner, position=position)
         elif action == Action.REMOVE_WALL:
-            position = next((c for c in adjacent_cells(state, factory.position) if c in state.walls), None)
+            position = target
             if position is not None:
-                state.walls.remove(position)
+                state.walls.discard(position)
                 state.log("remove_wall", owner=owner, position=position)
         elif action == Action.MINE and factory.position in state.mining_nodes:
-            state.gathered[owner] += 1
+            state.gathered[owner] += int(self.config.mining_counts_as_resource)
             factory.energy += 1.0
             state.log("mine", owner=owner, position=factory.position)
 
