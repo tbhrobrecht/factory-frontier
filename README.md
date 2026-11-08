@@ -96,7 +96,7 @@ All presets use `FactoryFrontier`; only configuration changes.
 | `dynamic_programming` | finite model for policy/value iteration |
 | `monte_carlo_td` | sampled trajectories; model hidden |
 | `model_free_control` | random map, energy, resources, danger |
-| `function_approximation` | larger layouts and full action vocabulary |
+| `function_approximation` | larger solvable layouts, fuel management, and jumps |
 | `policy_methods` | meaningful stochastic transitions |
 | `ppo` | rooms, cooldowns, entities, partial observability |
 | `competition` | symmetric maps and simultaneous two-agent play |
@@ -152,6 +152,60 @@ Builds and jumps are disabled, and `transition_model()` remains unavailable.
 ```powershell
 python -m student.student_view --config model_free_control
 python -m student.train --config model_free_control --episodes 100
+```
+
+### Function approximation exercises
+
+`function_approximation` extends navigation and refuelling to fully observable
+12×12 maps with 14 collectibles and random walls. The factory starts with 16
+energy; moves cost 1 and two-cell jumps cost 2. Jumping saves a turn and can cross
+a wall if the landing cell is free. A mining stop at `(11, 3)` and a randomized
+wall-free route onward guarantee a solution for the default configuration, even
+using ordinary moves. Resources, mining and route choice provide fuel options.
+Danger advances every five turns, covering the entire map at the 60-step cap.
+Rewards match `model_free_control`, including the net `-0.05` cost of mining.
+Building and wall removal are disabled in this stage; their canonical action
+indices are retained. Model access is hidden.
+
+Use the NumPy helpers in `factory_frontier.wrappers` as a starting point:
+
+```python
+import numpy as np
+from factory_frontier import FactoryFrontier
+from factory_frontier.wrappers import encode_features, mask_action_values
+
+env = FactoryFrontier("function_approximation")
+observation, _ = env.reset(seed=42)
+features = encode_features(observation)  # float32, shape (4165,)
+weights = np.zeros((env.action_space.n, features.size), dtype=np.float32)
+q_values = weights @ features
+action = int(np.argmax(mask_action_values(q_values, observation["action_mask"])))
+```
+
+The encoder one-hot encodes the 13 grid categories and zeros unseen/padded cells.
+It includes visibility, mining nodes, masked entity features, entity masks,
+factory/opponent/danger features, map dimensions scaled by padded grid size, and
+the action mask, in that order. Existing scalar feature scaling is preserved.
+The encoder uses no learned statistics and returns an independent array. It
+works with `ModelAdapter(model, preprocess=encode_features)` for inference.
+Linear models can start with the example above; neural models can use the same
+vector or a student-designed spatial encoder. Training remains student work.
+
+Mask action values during greedy/exploratory action selection and next-state
+maximization. Use zero continuation on `terminated` or an empty next-action mask;
+otherwise bootstrap from legal next actions, including at external truncation.
+The NumPy mask helper applies to Q-values or logits, before softmax if needed;
+tensor-based training should apply the equivalent mask inside its framework.
+Use fixed training seeds for debugging and separate held-out seeds for evaluating
+generalization. Students can vary features, architectures, exploration and
+discounts without changing the engine. Overrides to map size, fuel, rewards or
+danger require checking feasibility again; the default guarantee does not cover
+arbitrary combinations.
+
+```powershell
+python -m student.student_view --config function_approximation
+python -m student.train --config function_approximation --episodes 100
+python -m student.evaluate --config function_approximation --seeds 100 101 102
 ```
 
 ### Dynamic programming exercises

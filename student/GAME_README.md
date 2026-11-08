@@ -25,14 +25,16 @@ Resources help you earn reward and replenish energy. Movement, jumps, and
 building can spend energy, so choose routes and builds that support the goal.
 Zero energy does not itself destroy the factory, but it can prevent actions.
 
-Except for `model_free_control`, built-in presets reward each step with `-0.01`,
-each gathered resource unit with `+1`, a win with `+10`, and a loss with `-10`.
+Except for `model_free_control` and `function_approximation`, built-in presets
+reward each step with `-0.01`, each gathered resource unit with `+1`, a win with
+`+10`, and a loss with `-10`.
 These rewards guide learning;
 they are separate from the competition score above. Custom configurations can
 change the weights.
 
-`model_free_control` uses `-0.1` per step and `+0.05` per resource, with the same
-win/loss rewards. Mining earns a net `-0.05` per turn, so refuel when needed
+`model_free_control` and `function_approximation` use `-0.1` per step and `+0.05`
+per resource, with the same win/loss rewards. Mining earns a net `-0.05` per turn,
+so refuel when needed
 rather than mining for points.
 
 ## Printed map legend
@@ -131,8 +133,9 @@ default configuration, two intervening turns must pass before another build.
 Movement and other legal actions remain available during that cooldown.
 
 In `model_free_control`, factories start with 8 energy and movement costs 1.
-Other presets start with 20 energy; movement is free in early presets and
-costs 0.1 from `function_approximation` onward. Jumps cost 2.
+In `function_approximation`, they start with 16 energy, movement costs 1, and
+jumps cost 2. Other presets start with 20 energy; movement is free in early
+presets and costs 0.1 from `policy_methods` onward. Jumps cost 2.
 These costs and build settings can be overridden in custom configurations.
 
 The default `model_free_control` map guarantees a mining node at `(7, 3)`,
@@ -143,6 +146,13 @@ while reaching the goal requires at least 14 moves. Danger covers the entire
 map at step 40, matching the episode cap; win before then. Death at the deadline
 is a termination rather than a time-limit truncation.
 
+`function_approximation` uses the same safe-refuelling generator on a 12 by 12
+map, with a mining node at `(11, 3)`, 14 collectibles, and a 60-step deadline.
+Moves, jumps, waiting and mining are available. Building and wall removal are
+disabled; jumps can cross walls but must land in a free cell. The default map
+has a solvable route even without jumping, letting you compare strategies and
+feature representations on the same seeded layouts.
+
 ## Which mechanics appear in each preset?
 
 | Preset | What to focus on |
@@ -151,12 +161,12 @@ is a termination rather than a time-limit truncation.
 | `mdp`, `dynamic_programming` | Same goal, with stochastic movement and an exposed transition model. |
 | `monte_carlo_td` | A 6 by 6 map with stochastic movement and no exposed model. |
 | `model_free_control` | Random walls, resources, mining, energy costs, and advancing danger; builds and jumps are unavailable. |
-| `function_approximation` | Larger map and all 15 actions, including builds and jumps. |
+| `function_approximation` | Larger solvable map, meaningful fuel costs, and jumps; building and wall removal are unavailable. |
 | `policy_methods` | All actions plus stochastic movement. |
 | `ppo` | All actions, stochastic movement, and partial observability. |
 | `competition` | Two factories acting simultaneously, partial observability, and danger from both sides. |
 
 For example, run `python -m student.student_view --config function_approximation`
-to explore a preset that enables all actions. The starter agent chooses random
-legal actions, so it may need several runs or a better policy to demonstrate
+to explore the navigation, refuelling and jumping task. The starter agent chooses
+random legal actions, so it may need several runs or a better policy to demonstrate
 every mechanic.

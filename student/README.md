@@ -80,6 +80,20 @@ choose a tail-value estimate or a finite-horizon objective for truncated data.
 
 ## Course progression
 
+For `function_approximation`, start with
+`from factory_frontier.wrappers import encode_features, mask_action_values`.
+`encode_features(observation)` returns a 4165-element float32 vector with
+categorical grid channels and the numerical state features. Use it for a
+linear value function or as input to your own neural network; alternatives
+such as local features or spatial encoders are encouraged. The root README
+documents the feature layout and a linear-model example.
+
+Apply `mask_action_values(values, observation["action_mask"])` before choosing
+an action, and mask next-action values in TD targets too. For epsilon-greedy
+exploration, sample from the nonzero action-mask entries. A terminal or empty
+next-action mask has zero bootstrap value. Keep tensor-based masking inside
+your chosen framework when computing gradients.
+
 The same student interface works with every curriculum preset:
 
 ```powershell

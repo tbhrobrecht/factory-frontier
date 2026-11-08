@@ -11,19 +11,22 @@ from factory_frontier.core.actions import DELTAS, MOVEMENT_ACTIONS
 
 
 @pytest.mark.parametrize("seed", [0, 7, 42])
-def test_generated_task_has_a_safe_refuelling_solution(seed):
-    env = FactoryFrontier("model_free_control")
+@pytest.mark.parametrize("preset", ["model_free_control", "function_approximation"])
+def test_generated_task_has_a_safe_refuelling_solution(seed, preset):
+    env = FactoryFrontier(preset)
     observation, _ = env.reset(seed=seed)
-    assert len(env.state.resources) == 5 and len(env.state.walls) == 5
-    assert observation["grid"][7, 3] == 2 and observation["mining_nodes"][7, 3]
+    fuel, goal = (env.config.height - 1, 3), (0, env.config.width - 1)
+    assert len(env.state.resources) == env.config.resource_count
+    assert len(env.state.walls) == int(env.config.width * env.config.height * env.config.wall_density)
+    assert observation["grid"][fuel] == 2 and observation["mining_nodes"][fuel]
     for _ in range(3):
         observation, _, terminated, _, _ = env.step(Action.EAST)
         assert not terminated
-    assert observation["grid"][7, 3] == 5 and observation["mining_nodes"][7, 3]
-    queue, seen = deque([((7, 3), [])]), {(7, 3)}
+    assert observation["grid"][fuel] == 5 and observation["mining_nodes"][fuel]
+    queue, seen = deque([(fuel, [])]), {fuel}
     while queue:
         position, path = queue.popleft()
-        if position == (0, 7):
+        if position == goal:
             break
         for action in MOVEMENT_ACTIONS:
             dr, dc = DELTAS[action]
@@ -33,7 +36,7 @@ def test_generated_task_has_a_safe_refuelling_solution(seed):
                 queue.append((target, path + [action]))
     else:
         pytest.fail("Generated map has no route to the goal")
-    assert len(path) == 11
+    assert len(path) == env.config.height + env.config.width - 5
     needed = len(path) - int(env.state.factory(0).energy)
     assert needed > 0  # Starting fuel alone cannot solve this task.
     for _ in range(needed):
