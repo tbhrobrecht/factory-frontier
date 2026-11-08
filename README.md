@@ -124,6 +124,31 @@ opponents, energy costs, advanced actions, or rule hooks. Custom reward
 components must also be stationary functions of position/action rather than
 episode history for this state representation to be valid.
 
+### Dynamic programming exercises
+
+Use `FactoryFrontier("dynamic_programming")` for a fully observable 5×5
+position-state MDP with 10% movement slip and an exposed transition model.
+The preset supports iterative policy evaluation, policy iteration, and value
+iteration using the same model. For each outcome, the Bellman contribution is
+`probability * (reward + discount * V[next_state])`, with the continuation term
+set to zero when `terminal` is true. Set the goal value to zero; its reward is
+earned on entry. The discount and convergence tolerance belong to the planner,
+not the environment configuration.
+
+The model includes invalid actions as waits. When executing a policy, choose
+an action allowed by the current observation's `action_mask`. Read the factory
+position from the cell coded `5` in `grid`. Reset between episodes, and replan
+if you change the map or configuration. A stationary policy plans beyond the
+external 50-step limit; to optimize specifically for that deadline, use backward
+induction with remaining steps as an additional planning state and zero value
+at zero remaining steps. Planning algorithms remain student exercises.
+
+Preview the default environment with:
+
+```powershell
+python -m student.student_view --config dynamic_programming
+```
+
 ## Instructor extension guide
 
 Create a variation without changing the engine:
