@@ -11,9 +11,10 @@ from factory_frontier.core.actions import DELTAS, MOVEMENT_ACTIONS
 
 
 @pytest.mark.parametrize("seed", [0, 7, 42])
-@pytest.mark.parametrize("preset", ["model_free_control", "function_approximation"])
+@pytest.mark.parametrize("preset", ["model_free_control", "function_approximation", "policy_methods"])
 def test_generated_task_has_a_safe_refuelling_solution(seed, preset):
-    env = FactoryFrontier(preset)
+    # Verify layout/fuel feasibility independently of sampled movement noise.
+    env = FactoryFrontier(preset, slip_probability=0.0)
     observation, _ = env.reset(seed=seed)
     fuel, goal = (env.config.height - 1, 3), (0, env.config.width - 1)
     assert len(env.state.resources) == env.config.resource_count

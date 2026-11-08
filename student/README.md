@@ -94,6 +94,17 @@ exploration, sample from the nonzero action-mask entries. A terminal or empty
 next-action mask has zero bootstrap value. Keep tensor-based masking inside
 your chosen framework when computing gradients.
 
+For `policy_methods`, use `masked_policy_probabilities(logits, action_mask)` from
+the same module, then sample an action with your agent's seeded NumPy generator.
+The helper applies softmax only over legal actions; it accepts an optional
+positive temperature. Keep the selected action and original mask in your
+trajectory. Environmental slip changes the movement outcome, not the action
+whose log-probability belongs in the policy loss. `ModelAdapter` greedily selects
+vector outputs, so sample explicitly in `StudentAgent.act()` for stochastic
+policies. Implement differentiable log-probabilities and entropy in your chosen
+framework; the NumPy helper is for action sampling and experimentation. See the
+root README for a runnable example and episode/actor-critic guidance.
+
 The same student interface works with every curriculum preset:
 
 ```powershell

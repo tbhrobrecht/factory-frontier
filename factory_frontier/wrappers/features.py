@@ -44,3 +44,25 @@ def mask_action_values(values: np.ndarray, action_mask: np.ndarray) -> np.ndarra
     if not np.isfinite(values[legal]).all():
         raise ValueError("Legal action values must be finite")
     return np.where(legal, values, -np.inf)
+
+
+def masked_policy_probabilities(
+    logits: np.ndarray, action_mask: np.ndarray, temperature: float = 1.0,
+) -> np.ndarray:
+    """Return a stable softmax distribution over legal actions only.
+
+    Input scores are logits, not probabilities. Temperature must be finite and
+    positive; larger values flatten the distribution. An empty legal-action mask
+    raises ValueError: do not sample after an episode ends. This NumPy helper is
+    for sampling/experiments, not a replacement for differentiable tensor code.
+    """
+    if not np.isfinite(temperature) or temperature <= 0:
+        raise ValueError("Temperature must be finite and positive")
+    masked = mask_action_values(logits, action_mask).astype(np.float64)
+    if not np.isfinite(masked).any():
+        raise ValueError("Cannot form a policy without legal actions")
+    # Center before scaling so large logits or small temperatures cannot cause
+    # positive exponent overflow. Very unlikely actions may safely underflow.
+    with np.errstate(over="ignore", under="ignore"):
+        weights = np.exp((masked - np.max(masked)) / temperature)
+    return weights / weights.sum()

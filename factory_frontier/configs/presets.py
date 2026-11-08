@@ -79,9 +79,12 @@ PRESETS: dict[str, CurriculumConfig] = {
         reward_weights={"time": -0.1, "resource": 0.05, "win": 10.0, "loss": -10.0},
     ),
     "policy_methods": CurriculumConfig(
-        "policy_methods", width=12, height=12, map_generator="random", enabled_actions=_RICH,
+        "policy_methods", width=12, height=12, map_generator="control",
+        enabled_actions=(*_MOVE, *JUMP_ACTIONS, Action.MINE),
         slip_probability=0.08, resources_enabled=True, danger_enabled=True, resource_count=14,
-        wall_density=0.12, movement_cost=0.1, max_steps=250,
+        wall_density=0.12, initial_energy=16.0, movement_cost=1.0, jump_cost=2.0,
+        boundary_interval=6, max_steps=72,
+        reward_weights={"time": -0.1, "resource": 0.05, "win": 10.0, "loss": -10.0},
     ),
     "ppo": CurriculumConfig(
         "ppo", width=14, height=14, map_generator="rooms", enabled_actions=_RICH,

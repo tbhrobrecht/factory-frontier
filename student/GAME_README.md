@@ -25,17 +25,15 @@ Resources help you earn reward and replenish energy. Movement, jumps, and
 building can spend energy, so choose routes and builds that support the goal.
 Zero energy does not itself destroy the factory, but it can prevent actions.
 
-Except for `model_free_control` and `function_approximation`, built-in presets
-reward each step with `-0.01`, each gathered resource unit with `+1`, a win with
-`+10`, and a loss with `-10`.
-These rewards guide learning;
-they are separate from the competition score above. Custom configurations can
-change the weights.
+Except for `model_free_control`, `function_approximation` and `policy_methods`,
+built-in presets reward each step with `-0.01`, each gathered resource unit with
+`+1`, a win with `+10`, and a loss with `-10`. These rewards guide learning; they
+are separate from the competition score above. Custom configurations can change
+the weights.
 
-`model_free_control` and `function_approximation` use `-0.1` per step and `+0.05`
-per resource, with the same win/loss rewards. Mining earns a net `-0.05` per turn,
-so refuel when needed
-rather than mining for points.
+Those three navigation/refuelling presets use `-0.1` per step and `+0.05` per
+resource, with the same win/loss rewards. Mining earns a net `-0.05` per turn,
+so refuel when needed rather than mining for points.
 
 ## Printed map legend
 
@@ -66,9 +64,10 @@ Destroyed entities disappear from the map.
 **Danger has no ASCII symbol.** A printed `.` can still be in a dangerous
 column. Read `observation["danger"]` to track the boundary.
 
-When enabled, danger advances every `boundary_interval` turns (five in the
-built-in presets). The boundary starts at column `-1`; its first advance covers
-column `0`. At the end of every turn, living entities in covered columns are
+When enabled, danger advances every `boundary_interval` turns (six in
+`policy_methods`, five in the other built-in presets). The boundary starts at
+column `-1`; its first advance covers column `0`. At the end of every turn,
+living entities in covered columns are
 destroyed, including those entering an already-covered column. Walls do not
 protect them. Danger is resolved before goal detection.
 
@@ -133,9 +132,9 @@ default configuration, two intervening turns must pass before another build.
 Movement and other legal actions remain available during that cooldown.
 
 In `model_free_control`, factories start with 8 energy and movement costs 1.
-In `function_approximation`, they start with 16 energy, movement costs 1, and
-jumps cost 2. Other presets start with 20 energy; movement is free in early
-presets and costs 0.1 from `policy_methods` onward. Jumps cost 2.
+In `function_approximation` and `policy_methods`, they start with 16 energy,
+movement costs 1, and jumps cost 2. Other presets start with 20 energy; movement is free in early
+presets and costs 0.1 in `ppo` and `competition`. Jumps cost 2.
 These costs and build settings can be overridden in custom configurations.
 
 The default `model_free_control` map guarantees a mining node at `(7, 3)`,
@@ -153,6 +152,15 @@ disabled; jumps can cross walls but must land in a free cell. The default map
 has a solvable route even without jumping, letting you compare strategies and
 feature representations on the same seeded layouts.
 
+`policy_methods` keeps those layouts, fuel costs and actions, and adds 8% slip
+to ordinary movement. The intended direction occurs with 92% probability; each
+other cardinal direction occurs with `8% / 3`. A blocked realized move stays
+in place. Jumps, waiting and mining do not slip. Danger advances every six turns,
+covering the map at the 72-step deadline. The map has a feasible route, but bad
+slips can still cause a loss. Use a stochastic policy to experiment with policy
+gradients or actor-critic methods; the agent's sampling and the environment's
+slips use separate random generators.
+
 ## Which mechanics appear in each preset?
 
 | Preset | What to focus on |
@@ -162,7 +170,7 @@ feature representations on the same seeded layouts.
 | `monte_carlo_td` | A 6 by 6 map with stochastic movement and no exposed model. |
 | `model_free_control` | Random walls, resources, mining, energy costs, and advancing danger; builds and jumps are unavailable. |
 | `function_approximation` | Larger solvable map, meaningful fuel costs, and jumps; building and wall removal are unavailable. |
-| `policy_methods` | All actions plus stochastic movement. |
+| `policy_methods` | Stochastic navigation and refuelling, jumps, and a 72-step deadline; building and wall removal are unavailable. |
 | `ppo` | All actions, stochastic movement, and partial observability. |
 | `competition` | Two factories acting simultaneously, partial observability, and danger from both sides. |
 

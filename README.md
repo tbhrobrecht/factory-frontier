@@ -97,7 +97,7 @@ All presets use `FactoryFrontier`; only configuration changes.
 | `monte_carlo_td` | sampled trajectories; model hidden |
 | `model_free_control` | random map, energy, resources, danger |
 | `function_approximation` | larger solvable layouts, fuel management, and jumps |
-| `policy_methods` | meaningful stochastic transitions |
+| `policy_methods` | stochastic navigation, fuel management, and masked policies |
 | `ppo` | rooms, cooldowns, entities, partial observability |
 | `competition` | symmetric maps and simultaneous two-agent play |
 
@@ -206,6 +206,61 @@ arbitrary combinations.
 python -m student.student_view --config function_approximation
 python -m student.train --config function_approximation --episodes 100
 python -m student.evaluate --config function_approximation --seeds 100 101 102
+```
+
+### Policy methods exercises
+
+`policy_methods` uses the same 12×12 protected-route layouts, 16 starting energy,
+move/jump costs, 14 collectibles, and rewards as `function_approximation`. Ordinary
+moves slip with probability `0.08`, split equally among the other three cardinal
+directions; a blocked realized direction stays in place. Jumps, mining and waiting
+do not slip. Danger advances every six steps, covering the map at the 72-step
+cap, allowing more recovery time for stochastic movement. Building and wall
+removal remain disabled. The world is fully observed but its transition model
+is hidden. Protected routes ensure feasible layouts, not guaranteed success
+under every possible sequence of slips.
+
+Use a stochastic policy to experiment with REINFORCE, baselines or actor-critic
+methods. For example, this samples from a uniform legal policy:
+
+```python
+import numpy as np
+from factory_frontier import FactoryFrontier
+from factory_frontier.wrappers import masked_policy_probabilities
+
+env = FactoryFrontier("policy_methods")
+observation, _ = env.reset(seed=42)
+rng = np.random.default_rng(7)  # Agent randomness is independent of environment randomness.
+logits = np.zeros(env.action_space.n)  # Replace with your model's output.
+probabilities = masked_policy_probabilities(logits, observation["action_mask"])
+action = int(rng.choice(env.action_space.n, p=probabilities))
+log_probability = float(np.log(probabilities[action]))
+next_observation, reward, terminated, truncated, info = env.step(action)
+```
+
+The helper masks illegal logits before a numerically stable softmax and accepts
+an optional positive `temperature` (default `1.0`). Higher temperatures flatten
+the distribution. It rejects an empty action mask; stop or reset instead of
+sampling after termination. `encode_features` supplies the same 4165-value
+input as in the preceding stage. `ModelAdapter` takes argmax for vector outputs;
+raw logits passed there do not produce stochastic sampling. Sample explicitly
+inside your agent's `act()` method for policy experiments.
+
+Save the selected action, its original observation/action mask, reward and ending
+flags in your trajectory. Learn the probability of the action you selected,
+not the direction realized after environmental slip. REINFORCE can accumulate
+complete episodes and calculate returns at termination; actor-critic methods
+can update each step and bootstrap state values at truncation, but not true
+termination. For tensor-based training, compute log-probabilities and entropy
+from the same masked distribution inside your framework so gradients are
+preserved; this NumPy helper does not build a gradient graph. Entropy calculations
+must ignore zero-probability entries. Implement the algorithm and checkpointing
+in `student/`, and compare multiple environment and agent seeds.
+
+```powershell
+python -m student.student_view --config policy_methods
+python -m student.train --config policy_methods --episodes 100
+python -m student.evaluate --config policy_methods --seeds 100 101 102 --agent-seed 7
 ```
 
 ### Dynamic programming exercises
