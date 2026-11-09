@@ -130,8 +130,10 @@ action resolves to `WAIT` and still uses a turn.
 | `13` | `REMOVE_WALL` | Remove an adjacent wall for no energy cost. |
 | `14` | `MINE` | Gain one energy on a mining node; also gather one resource in single-player, but no resource points in competition. |
 
-Builds choose the first free adjacent cell in this order: **east, south, west,
-north**. Wall removal uses the same order among adjacent walls. You do not
+Builds choose the first free adjacent cell in this order for player 0:
+**east, south, west, north**. Player 1 uses the mirrored order:
+**west, north, east, south**. Wall removal uses the same respective order among
+adjacent walls. You do not
 select a direction for these actions. A build starts a cooldown: with the
 default configuration, two intervening turns must pass before another build.
 Movement and other legal actions remain available during that cooldown.

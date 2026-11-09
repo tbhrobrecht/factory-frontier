@@ -4,6 +4,11 @@ Factory Frontier is a grid-based, Gymnasium-compatible reinforcement-learning te
 
 ## Install and try it
 
+Students should download or clone the complete repository, or unpack its source
+distribution, and run the commands below from that directory. These include the
+editable `student/` workspace and course guides. The wheel installs the engine
+and reference examples; use the complete source download for coursework.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -361,11 +366,16 @@ config = get_config("ppo").with_overrides(
 env = FactoryFrontier(config)
 ```
 
+Configurations validate numeric ranges, action indices, build costs and generator
+dimensions when constructed or overridden. Generator names are `empty`, `random`,
+`control`, `rooms` and `symmetric`. Valid custom settings still require checking
+task feasibility; validation does not guarantee that an arbitrary task is solvable.
+
 Extension points are intentionally small:
 
 - Add entity data/types in `core/entities`; behavior remains in rules.
-- Add map generators through `core/map_generation` and select them in a config.
-- Add a reward callable implementing `RewardComponent` and pass it through `reward_components=`; components receive immutable before/after context.
+- Add map generators through `core/map_generation`, add their accepted names to configuration validation, and select them in a config.
+- Add a reward callable implementing `RewardComponent` and pass it through `reward_components=`. Treat its before/after game states as read-only; the frozen context does not freeze those states. Implement state changes through `RuleHook`.
 - Add mechanics with `RuleHook.before_step` / `after_step` and pass them through `rules=`; state mutation remains in rules rather than agents.
 - Extend encoding in `core/observations.py`, retaining existing field meanings and shapes.
 - Append canonical actions in `core/actions.py`, then update masks/rules while preserving old indices.

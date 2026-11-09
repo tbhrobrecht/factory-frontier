@@ -143,3 +143,30 @@ def test_custom_rule_and_reward_are_injectable() -> None:
     _, reward, _, _, info = env.step(Action.WAIT)
     assert reward == 3.0
     assert any(event["event"] == "custom_before" for event in info["events"])
+
+
+@pytest.mark.parametrize("overrides", [
+    {"width": 0}, {"height": -1}, {"width": 2.5}, {"max_steps": 0},
+    {"boundary_interval": 0}, {"visibility_radius": -1}, {"max_entities": 0},
+    {"slip_probability": 1.5}, {"wall_density": float("nan")}, {"movement_cost": -1},
+    {"map_generator": "typo"}, {"map_generator": "rooms"},
+    {"map_generator": "symmetric", "width": 8, "height": 5},
+    {"enabled_actions": (15,)}, {"enabled_actions": (Action.BUILD_SCOUT,), "build_costs": {}},
+    {"reward_weights": {"win": float("inf")}},
+])
+def test_invalid_configs_fail_before_reset(overrides: dict) -> None:
+    with pytest.raises(ValueError):
+        FactoryFrontier("intro", **overrides)
+
+
+def test_config_overrides_own_their_mappings() -> None:
+    from factory_frontier.configs import get_config
+
+    weights = {"win": 2.0}
+    config = get_config("intro", reward_weights=weights)
+    weights["win"] = 999.0
+    copy = config.with_overrides()
+    copy.reward_weights["win"] = 10.0
+    assert config.reward_weights == {"win": 2.0}
+    with pytest.raises(ValueError):
+        config.with_overrides(max_steps=0)

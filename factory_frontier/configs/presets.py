@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from math import isfinite
+from numbers import Integral, Real
 from typing import Any
 
 from factory_frontier.core.actions import Action, JUMP_ACTIONS, MOVEMENT_ACTIONS
@@ -46,6 +48,52 @@ class CurriculumConfig:
     reward_weights: dict[str, float] = field(
         default_factory=lambda: {"time": -0.01, "resource": 1.0, "win": 10.0, "loss": -10.0}
     )
+
+    def __post_init__(self) -> None:
+        for name in ("width", "height", "max_grid_size", "max_entities", "max_steps", "boundary_interval",
+                     "visibility_radius", "build_cooldown", "resource_count"):
+            value = getattr(self, name)
+            minimum = 0 if name in ("visibility_radius", "build_cooldown", "resource_count") else 1
+            if isinstance(value, bool) or not isinstance(value, Integral) or value < minimum:
+                raise ValueError(f"{name} must be an integer >= {minimum}")
+        if self.width > self.max_grid_size or self.height > self.max_grid_size:
+            raise ValueError("Map dimensions exceed stable observation padding")
+        if self.opponent_enabled and self.max_entities < 2:
+            raise ValueError("Opponent configurations need max_entities >= 2")
+        if self.map_generator not in {"empty", "random", "control", "rooms", "symmetric"}:
+            raise ValueError(f"Unknown map_generator {self.map_generator!r}")
+        if self.map_generator == "rooms" and min(self.width, self.height) < 8:
+            raise ValueError("The rooms generator requires width and height of at least 8")
+        if self.map_generator == "symmetric" and (
+            self.width < 8 or self.height < 4 or self.width % 2 or self.height % 2
+            or (self.resources_enabled and self.resource_count % 2)
+        ):
+            raise ValueError("Symmetric maps need even dimensions (width >= 8, height >= 4) and an even resource count")
+        for name in ("slip_probability", "wall_density", "initial_energy", "movement_cost", "jump_cost"):
+            value = getattr(self, name)
+            if not isinstance(value, Real) or not isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and nonnegative")
+            if name in ("slip_probability", "wall_density") and value > 1:
+                raise ValueError(f"{name} must be between 0 and 1")
+        if not self.enabled_actions or any(
+            isinstance(action, bool) or not isinstance(action, Integral) or action not in tuple(Action)
+            for action in self.enabled_actions
+        ):
+            raise ValueError("enabled_actions must contain canonical action indices")
+        build_actions = {Action.BUILD_SCOUT, Action.BUILD_WORKER, Action.BUILD_MINER, Action.BUILD_WALL}
+        if any(isinstance(action, bool) or not isinstance(action, Integral) for action in self.build_costs) or (
+            set(self.build_costs) - build_actions
+            or (set(self.enabled_actions) & build_actions) - set(self.build_costs)
+        ):
+            raise ValueError("build_costs must specify costs for enabled builds and only use build action keys")
+        for costs, nonnegative in ((self.build_costs, True), (self.reward_weights, False)):
+            if any(not isinstance(value, Real) or not isfinite(value) or (nonnegative and value < 0)
+                   for value in costs.values()):
+                raise ValueError("Build costs must be finite and nonnegative; reward weights must be finite")
+        # Own mappings supplied through overrides as well as direct construction.
+        object.__setattr__(self, "enabled_actions", tuple(Action(action) for action in self.enabled_actions))
+        object.__setattr__(self, "build_costs", {Action(action): cost for action, cost in self.build_costs.items()})
+        object.__setattr__(self, "reward_weights", dict(self.reward_weights))
 
     def with_overrides(self, **values: Any) -> "CurriculumConfig":
         unknown = set(values) - set(self.__dataclass_fields__)
@@ -118,13 +166,4 @@ def get_config(config: str | CurriculumConfig = "intro", **overrides: Any) -> Cu
         resolved = config
     else:
         raise TypeError("config must be a preset name or CurriculumConfig")
-    # Defensive copies keep global presets immutable even though mapping values are mutable.
-    resolved = replace(
-        resolved,
-        build_costs=dict(resolved.build_costs),
-        reward_weights=dict(resolved.reward_weights),
-    )
-    result = resolved.with_overrides(**overrides) if overrides else resolved
-    if result.width > result.max_grid_size or result.height > result.max_grid_size:
-        raise ValueError("Map dimensions exceed stable observation padding")
-    return result
+    return resolved.with_overrides(**overrides)

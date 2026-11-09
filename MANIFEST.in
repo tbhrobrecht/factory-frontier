@@ -1,0 +1,5 @@
+include student_view.py
+recursive-include student *.py *.md
+include student/checkpoints/.gitkeep
+include student/results/.gitkeep
+recursive-include tests *.py

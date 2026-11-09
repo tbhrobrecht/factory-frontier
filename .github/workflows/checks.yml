@@ -1,0 +1,61 @@
+name: Checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.12', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest
+      - run: python -m pip check
+
+  distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install build setuptools wheel pytest
+      - run: python -m build
+      - run: python -m pip install dist/*.whl
+      - name: Check installed wheel outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          from gymnasium.utils.env_checker import check_env
+          from factory_frontier import FactoryFrontier
+          from factory_frontier.configs import PRESETS
+          from factory_frontier.wrappers import encode_features
+          for name in PRESETS:
+              env = FactoryFrontier(name)
+              check_env(env, skip_render_check=True)
+              observation, _ = env.reset(seed=0)
+              assert encode_features(observation).shape == (4165,)
+          PY
+      - name: Check the source distribution as a student handout
+        run: |
+          mkdir "$RUNNER_TEMP/course"
+          tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP/course" --strip-components=1
+          cd "$RUNNER_TEMP/course"
+          test -f student/WALKTHROUGH.md
+          test -f student/GAME_README.md
+          test -d student/checkpoints
+          python -m pip install --no-deps --no-build-isolation .
+          python -m pytest
+          python -m student.evaluate
+          python -m factory_frontier.examples.tournament
+          python -m pip check

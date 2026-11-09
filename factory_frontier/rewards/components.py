@@ -10,6 +10,12 @@ from factory_frontier.core.state import GameState
 
 @dataclass(frozen=True, slots=True)
 class RewardContext:
+    """Transition data for rewards; treat both game states as read-only.
+
+    The frozen context prevents field reassignment, not mutation of GameState.
+    Implement state changes through RuleHook rather than reward components.
+    """
+
     before: GameState
     after: GameState
     owner: int
