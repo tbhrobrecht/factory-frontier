@@ -48,8 +48,13 @@ class CurriculumConfig:
     reward_weights: dict[str, float] = field(
         default_factory=lambda: {"time": -0.01, "resource": 1.0, "win": 10.0, "loss": -10.0}
     )
+    # Planning parameter only: the engine always returns undiscounted rewards.
+    gamma: float = 0.99
 
     def __post_init__(self) -> None:
+        if (isinstance(self.gamma, bool) or not isinstance(self.gamma, Real)
+                or not isfinite(self.gamma) or not 0 <= self.gamma < 1):
+            raise ValueError("gamma must be finite and satisfy 0 <= gamma < 1")
         for name in ("width", "height", "max_grid_size", "max_entities", "max_steps", "boundary_interval",
                      "visibility_radius", "build_cooldown", "resource_count"):
             value = getattr(self, name)

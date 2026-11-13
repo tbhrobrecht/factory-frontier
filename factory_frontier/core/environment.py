@@ -174,7 +174,8 @@ class FactoryFrontier(gym.Env[dict[str, np.ndarray], int]):
         The goal is absorbing with zero further reward; entering it earns the win
         reward once. The external episode time limit is not part of this model:
         outcomes report termination, not truncation. Model queries do not advance
-        the live episode or its random generator.
+        the live episode or its random generator. Planners use config.gamma for
+        infinite-horizon discounted returns; all returned rewards are undiscounted.
         """
 
         state = self._require_state()

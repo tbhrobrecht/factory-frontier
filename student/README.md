@@ -172,12 +172,29 @@ After `reset()`, call `env.transition_model()` in `mdp` or
 Invalid actions are waits without slip. Legal moves keep their direction with
 probability `1 - slip`; each other direction gets `slip / 3`.
 
-Use `probability * (reward + discount * V[next_state])` in Bellman updates,
-with zero continuation on terminal outcomes. The goal is absorbing with zero
-subsequent reward. The model excludes the external time limit: include remaining
-steps in your planner if optimizing for that deadline. Model queries do not
-advance the episode or RNG. Custom position models require movement-only rules
-and stationary position/action rewards.
+The planning problem is an **infinite-horizon discounted MDP**, with
+`gamma = env.config.gamma` (default `0.99`, configurable via
+`FactoryFrontier("mdp", gamma=0.95)`, valid range `0 <= gamma < 1`). Maximize
+the expected sum of `gamma**t * reward_t`. Apply discounting in your planner;
+the engine and model return undiscounted rewards.
+
+Use `probability * (reward + gamma * V[next_state])` in Bellman updates,
+with zero continuation on terminal outcomes. `WAIT` is a deterministic
+self-transition. Blocked slip outcomes stay in place and their probabilities
+are added. A normal step pays `-0.01`; first entering the goal pays `+9.99`.
+The goal is terminal and absorbing in the model: every action returns
+`(1.0, goal, 0.0, True)`, so its value is zero. The simulator requires a reset
+after an episode ends and cannot pay the goal reward again.
+
+The **50-step simulation cutoff** reports `truncated=True`, not MDP termination,
+and is excluded from the model. Do not treat it as a terminal state in discounted
+planning or add remaining steps to the planning state for this exercise.
+Position is sufficient for the underlying MDP: transition/reward distributions
+do not depend on episode history. The observation also carries a simulation
+step counter, which does not change these dynamics. Model queries do not advance
+the episode or RNG. Custom position models require movement-only rules and
+stationary position/action rewards. Implement Value Iteration and Policy
+Iteration yourself; the repository supplies the model, not their solutions.
 
 ### Monte Carlo, TD and control
 
