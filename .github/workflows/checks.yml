@@ -52,7 +52,7 @@ jobs:
           tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP/course" --strip-components=1
           cd "$RUNNER_TEMP/course"
           test -f student/WALKTHROUGH.md
-          test -f student/GAME_README.md
+          test -f student/README.md
           test -d student/checkpoints
           python -m pip install --no-deps --no-build-isolation .
           python -m pytest
