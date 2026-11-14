@@ -102,6 +102,9 @@ def train(
         )
         returns.append(episode_return)
         successes += int(success)
+    finish = getattr(agent, "finish_training", None)
+    if callable(finish):
+        finish()
     greedy = greedy_evaluation(agent, config, evaluation_seeds, seed)
     env.close()
     saved_checkpoint = ""
