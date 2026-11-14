@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import numpy as np
 
 from factory_frontier import Action, FactoryFrontier
 from student.agent import StudentAgent
@@ -12,6 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="intro", help="Curriculum preset name")
     parser.add_argument("--seed", type=int, default=42, help="Reproducible episode seed")
+    parser.add_argument("--checkpoint", help="Load a trained agent; requires StudentAgent.load(path)")
     parser.add_argument(
         "--render-steps",
         type=int,
@@ -21,7 +23,20 @@ def main() -> None:
     args = parser.parse_args()
 
     env = FactoryFrontier(args.config, render_mode="ansi")
-    agent = StudentAgent(seed=args.seed)
+    if args.checkpoint:
+        loader = getattr(StudentAgent, "load", None)
+        if not callable(loader):
+            parser.error("--checkpoint requires StudentAgent.load(path)")
+        agent = loader(args.checkpoint)
+        if hasattr(agent, "rng"):
+            agent.rng = np.random.default_rng(args.seed)
+        if hasattr(agent, "epsilon"):
+            agent.epsilon = 0.0
+    else:
+        agent = StudentAgent(seed=args.seed)
+    metadata = getattr(agent, "checkpoint_metadata", {})
+    if args.checkpoint and metadata.get("config") not in (None, args.config):
+        parser.error("Checkpoint configuration does not match --config")
     observation, info = env.reset(seed=args.seed)
     agent.reset(observation)
 
