@@ -227,3 +227,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local instructor solutions are not part of the student repository.
+/student/sample_code/

@@ -3,3 +3,6 @@ recursive-include student *.py *.md
 include student/checkpoints/.gitkeep
 include student/results/.gitkeep
 recursive-include tests *.py
+
+# Exclude instructor solutions even when building from a local working tree.
+prune student/sample_code

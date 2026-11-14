@@ -2,11 +2,14 @@
 
 Start with the [walkthrough](WALKTHROUGH.md) for installation and your first agent.
 This file is the reference for game rules, observations and learning algorithms.
-All commands run from the repository root.
+All commands run from the repository root. The course ends at `ppo`; competition
+is outside this release's coursework.
 
 ## Your workspace
 
-Write coursework inside `student/`; you may read the engine but must not modify it.
+Implement algorithms in `student/agent.py`; add helper modules and tests under
+`student/` as needed. You may read the engine but must not modify it. The shared
+training, evaluation and visualization scripts work through the same agent interface.
 
 | File or directory | Purpose |
 |---|---|
@@ -26,34 +29,29 @@ formats are ignored by Git; submit those through the course artifact channel.
 Your agent controls a moving factory and chooses one action per turn.
 Coordinates are `(row, column)`, starting at the top-left `(0, 0)`.
 
-- **Single-player:** start at the bottom-left and reach `(0, width - 1)` to win.
+- **Goal:** start at the bottom-left and reach `(0, width - 1)` to win.
   Danger destroying your factory ends the episode in defeat. The time limit
   ends an unfinished episode through `truncated`.
-- **Competition:** player 0 starts bottom-left; player 1 starts top-right.
-  One survivor wins; losing both factories together draws. If both survive
-  turn 60, compare collected resources first, then remaining energy. Equal
-  scores draw. Reaching the opposite corner does not win.
 - **Fuel:** a factory collecting a resource gains 1 energy and 1 resource point.
-  `MINE` on a renewable node adds 1 energy. Mining also earns a resource point
-  in single-player, but earns no points in competition. Zero energy prevents
-  unaffordable actions; it does not destroy the factory.
+  `MINE` on a renewable node adds 1 energy and 1 resource point. Zero energy
+  prevents unaffordable actions; it does not destroy the factory.
 - **Movement:** walls and occupied cells block landing. Jumps travel two cells
   and can cross walls or units. Ordinary moves may slip into another direction;
   blocked realized moves stay in place. Jumps, mining and waiting do not slip.
 - **Danger:** starts outside the map and advances by one column at its interval.
-  It moves from the left in single-player and from both sides in competition.
-  Covered columns destroy entities every turn, including on entry. Danger is
+  It moves from left to right. Covered columns destroy entities every turn,
+  including on entry. Danger is
   resolved before goal detection. Walls offer no protection.
-- **Visibility:** PPO shows cells within Manhattan distance 3; competition uses
-  distance 4. Walls do not block visibility. The ASCII display shows the full
-  map for debugging; policies must use their observations.
+- **Visibility:** PPO shows cells within Manhattan distance 3; the other course
+  presets are fully observed. Walls do not block visibility. The ASCII display
+  shows the full map for debugging; policies must use their observations.
 
 ### Map and action legend
 
 | Printed symbol | Meaning |
 |---|---|
-| `F` / `f` | Player 0 / player 1 factory |
-| `S` / `s`, `W` / `w`, `M` / `m` | Scout, worker, miner |
+| `F` | Your factory |
+| `S`, `W`, `M` | Scout, worker, miner (custom configurations only) |
 | `#` | Wall |
 | `*` | Collectible resource |
 | `n` | Renewable mining node |
@@ -76,10 +74,9 @@ becomes `WAIT` and still consumes a turn. Action indices stay fixed across prese
 | 13 | `REMOVE_WALL` | Remove an adjacent wall for free |
 | 14 | `MINE` | Refuel on a mining node |
 
-Building/removal are disabled in all default presets. In custom configurations,
-builds pick the first free neighbor: east, south, west, north for player 0;
-west, north, east, south for player 1. Wall removal uses the same order among
-walls. Default build cooldown requires two intervening turns. Built units are
+Building/removal are disabled in all course presets. In custom configurations,
+builds pick the first free neighbor: east, south, west, north. Wall removal uses
+the same order among walls. Default build cooldown requires two intervening turns. Built units are
 stationary: they collect resources on their cell but do not move, extend
 visibility or automatically mine. There is no combat.
 
@@ -88,17 +85,17 @@ visibility or automatically mine. There is no combat.
 | Presets | Per turn | Per resource point | Win | Loss |
 |---|---:|---:|---:|---:|
 | `intro` through `monte_carlo_td` | -0.01 | +1 | +10 | -10 |
-| `model_free_control` through `competition` | -0.1 | +0.05 | +10 | -10 |
+| `model_free_control` through `ppo` | -0.1 | +0.05 | +10 | -10 |
 
-Competition factory destruction costs an additional -10, including on a
-simultaneous-death draw. Mining has net reward -0.05 in the single-player fuel
-tasks and -0.1 in competition. Tournament results use scores, independently of reward.
+Mining has net reward -0.05 in the fuel tasks: it replenishes energy but still
+costs a turn. Rewards are undiscounted; apply your chosen discount in the algorithm.
 
 ## Agent interface and observations
 
-Implement `reset(observation)` for episode memory and `act(observation)` to
-return an integer action. Keep learned parameters across episode resets.
-Training calls:
+Keep the `StudentAgent(seed=None)` constructor and the existing methods:
+`reset(observation)` prepares episode memory, `act(observation)` returns an
+integer action, and `update(...)` learns from experience. Preserve learned
+parameters across resets. Training calls:
 
 ```python
 update(observation, action, reward, next_observation, terminated, truncated)
@@ -120,7 +117,7 @@ Stop on `terminated or truncated`, then reset before stepping again.
 | `map_shape` | `(2,)` | Active height, width inside padding |
 | `mining_nodes` | `(16, 16)` | Visible nodes, including beneath entities/resources |
 | `action_mask` | `(15,)` | 1 for legal actions |
-| `factory`, `opponent` | `(8,)` each | Factory features; absent or unseen opponent is zeroed |
+| `factory`, `opponent` | `(8,)` each | Factory features; `opponent` is reserved and zero in course presets |
 | `entities`, `entity_mask` | `(32, 8)`, `(32,)` | Visible entity features and valid rows |
 | `danger` | `(4,)` | Enabled, boundary/width, distance to your side's boundary/width, interval/100 |
 
@@ -128,7 +125,7 @@ Factory features are `[alive, row/(height-1), column/(width-1), energy/100,
 health/3, cooldown/10, gathered/100, step/max_steps]`; position denominators
 are at least 1. Entity rows are `[kind/4, friendly, normalized row, normalized
 column, energy/100, health/3, cooldown/10, 1]`.
-Coordinates and action directions are absolute, including in the second seat.
+Coordinates and action directions are absolute.
 Use observations as policy inputs; `env.state` and full event logs are debug tools.
 
 ## Curriculum and algorithms
@@ -146,7 +143,6 @@ Implement the algorithm assigned in your course inside `student/`.
 | `function_approximation` | 12x12 random walls | 0% | 60 | Linear or neural value functions |
 | `policy_methods` | 12x12 random walls | 8% | 72 | REINFORCE, baselines, actor-critic |
 | `ppo` | 14x14 rooms, local view | 5% | 112 | PPO rollouts, advantages and clipped updates |
-| `competition` | 16x16 mirrored, local view | 5% | 60 | Train and evaluate against other agents |
 
 Fuel-task defaults:
 
@@ -156,7 +152,6 @@ Fuel-task defaults:
 | `function_approximation` | 16 | 14 | 5 turns | `(11, 3)` |
 | `policy_methods` | 16 | 14 | 6 turns | `(11, 3)` |
 | `ppo` | 20 | 20 | 8 turns | `(13, 3)` |
-| `competition` | 16 | 24 | 8 turns | `(15, 3)` and `(0, 12)` |
 
 Ordinary movement costs 1 in fuel tasks and 0 in earlier stages. Jumps cost 2
 and are enabled from `function_approximation` onward; mining starts at
@@ -171,6 +166,11 @@ After `reset()`, call `env.transition_model()` in `mdp` or
 `(probability, next_state, reward, terminal)`. Later stages hide the model.
 Invalid actions are waits without slip. Legal moves keep their direction with
 probability `1 - slip`; each other direction gets `slip / 3`.
+
+Choosing `--config mdp` selects the environment, not a planning algorithm.
+Your agent must obtain the model from a reset environment with matching settings
+and implement planning itself. The shared scripts pass observations to the agent;
+they do not automatically supply a model or change the agent's algorithm.
 
 The planning problem is an **infinite-horizon discounted MDP**, with
 `gamma = env.config.gamma` (default `0.99`, configurable via
@@ -220,8 +220,8 @@ seeds before expecting generalization to unseen maps.
   sample with your agent's RNG. It rejects empty masks.
 
 Train linear/neural models or choose your own features. NumPy helpers do not
-carry gradients; implement differentiable masking, log-probabilities and entropy
-inside your learning framework. Ignore zero-probability actions in entropy.
+carry gradients: implement analytic gradients for NumPy models, or differentiable
+masking, log-probabilities and entropy inside your tensor framework. Ignore zero-probability actions in entropy.
 Store the selected action and original mask, even if the environment slips.
 `ModelAdapter` accepts scalar actions or full action vectors and selects greedily;
 it does not sample stochastic policies or manage recurrent memory.
@@ -238,47 +238,49 @@ either ending flag. At rollout cutoffs, bootstrap without resetting a live
 environment; at truncation, use the final observation before resetting. Reset
 recurrent episode memory at episode boundaries and keep training sequences
 ordered. Feed-forward policies are valid; memory is an optional experiment.
+Buffering agents may implement `finish_training()` to optimize their final partial
+rollout. The trainer calls it before final evaluation and checkpoint saving.
 
-## Training, evaluation and competition
+## Train, evaluate and watch
 
-For single-player stages, replace `model_free_control` below with your preset:
+| Script | What it does |
+|---|---|
+| `student.train` | Creates an agent, evaluates a baseline, trains with `update()`, evaluates again and writes a summary |
+| `student.evaluate` | Evaluates an agent without calling `update()` |
+| `student.student_view` | Displays one episode without calling `update()` |
 
-```powershell
-python -m student.train --config model_free_control --episodes 100 --seed 0
-python -m student.evaluate --config model_free_control --seeds 100 101 102 --agent-seed 7
-python -m pytest student/tests
-```
-
-`train.py` creates a new agent and writes a summary, not a checkpoint. Add saving
-to training and loading to evaluation when implementing learning. Save feature
-scaling too. Use separate training/evaluation seeds and compare several agent
-seeds. The generic loop supplies transitions; batching and optimization are yours.
-
-Competition requires the two-agent API; single-player helpers reject it.
-Both players choose from the same pre-turn state. Occupied starting cells
-cannot be entered; same-destination moves cancel without energy cost.
-Central columns 7 and 8 remain safe at turn 60; the deadline is termination.
-
-```python
-from student.agent import StudentAgent
-from factory_frontier.agents import SurvivalAgent
-from factory_frontier.competition import play_match
-
-learner = StudentAgent(seed=0)
-for seed in range(100):
-    result = play_match(learner, SurvivalAgent(), seed=seed, training_owners=(0,))
-```
-
-Use separate agent instances. `(0,)` updates the first learner; `(0, 1)` updates
-both. Omit `training_owners` for evaluation. Preserve learned parameters across
-matches. Policies must handle both seats. For tournaments, use factories that
-create fresh agents and load checkpoints; `round_robin` plays both seats per seed.
-Wins earn 3 leaderboard points, draws 1; ties sort by wins, resources, then name.
-`result.save_replay(path)` saves settings and actions; `render_replay(path)`
-reconstructs ASCII frames. Partial-observation `info` exposes only your own events.
-
-Run the supplied tournament example with:
+Start by learning one fixed map; replace the preset as you progress:
 
 ```powershell
-python -m factory_frontier.examples.tournament
+python -m student.train --config model_free_control --map-seed 0 --episodes 3000 --seed 0
 ```
+
+`--map-seed` repeats the environment seed. Without it, `model_free_control`
+repeats `--seed` by default; other presets vary seeds. Use `--vary-maps` to
+explicitly train across maps. Optional `--alpha` / `--epsilon` overrides require
+attributes of those names on your agent; otherwise set parameters in `agent.py`.
+The starter's empty `update()` collects experience without learning.
+
+Training writes `student/results/training_summary.json`. If your agent implements
+`save(path)`, it also saves `student/checkpoints/<preset>.checkpoint`; override the
+path with `--checkpoint`. Implement `load(path)` as a class method returning a
+ready-to-use agent. Save the encoder/scaling with its parameters. These methods
+are optional; the starter has neither.
+
+After implementing save/load and training, evaluate or watch the checkpoint:
+
+```powershell
+python -m student.evaluate --config model_free_control --seeds 0 --checkpoint student/checkpoints/model_free_control.checkpoint
+python -m student.student_view --config model_free_control --seed 0 --checkpoint student/checkpoints/model_free_control.checkpoint --render-steps 40
+```
+
+Without `--checkpoint`, both commands create a fresh agent; they do not load
+previous training automatically. Use checkpoints from the same algorithm and
+feature encoder. Evaluation disables epsilon exploration when supported;
+softmax policies still sample from their distributions.
+
+Compare returns, success rate and episode length. Reported returns are
+**undiscounted**. Same-map wins demonstrate learning on that map, not
+generalization: test separate seeds such as `100 101 102` and several agent seeds
+with `--agent-seed`. Value prediction alone does not improve a policy; control
+algorithms must also use learned values or policy parameters to choose actions.
