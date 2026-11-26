@@ -1,0 +1,411 @@
+% Lecture source. Build from this directory using the supplied latexmkrc.
+% Content sources: ../README.md, ../student/WALKTHROUGH.md,
+% ../student/README.md, ../student/agent.py and shared CLI scripts.
+\documentclass[english,aspectratio=169,sectionpage=false]{tumbeamer}
+\usepackage{booktabs}
+\usepackage{listings}
+% Monospaced code with separate colors for commands, options and strings.
+\definecolor{CodeString}{RGB}{20,105,65}
+\definecolor{CodeOption}{RGB}{116,57,143}
+\lstdefinelanguage{ProjectShell}{
+  sensitive=true,
+  alsoletter={-$},
+  morekeywords={python,python3,git,cd,source,Set-ExecutionPolicy},
+  morekeywords=[2]{-m,-e,-Scope,-ExecutionPolicy,--version,--config,--seed,
+    --seeds,--render-steps,--episodes,--map-seed,--checkpoint},
+  morekeywords=[3]{$stage,$model},
+  morecomment=[l]{\#},
+  morestring=[b]",
+  morestring=[b]',
+}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  showstringspaces=false,breaklines=false,aboveskip=0.6em,belowskip=0.6em,
+  language=ProjectShell,
+  keywordstyle=\color{TUMBlue},keywordstyle=[2]\color{CodeOption},
+  keywordstyle=[3]\color{TUMBlueDark},
+  stringstyle=\color{CodeString},commentstyle=\color{TUMGrayDark}\itshape}
+
+\title{Project Case Study | Factory Frontier}
+\subtitle{}
+\author{}
+\institute{Technical University of Munich\\[1.8mm]
+  TUM School of Management\\[1.8mm]
+  Chair of Business Analytics}
+\date{Heilbronn, 25.11.2026}
+\footline{Introduction to Reinforcement Learning | Project Case Study}
+\TUMbeamersetup{
+  title page = TUM tower,
+  tower scale = 0.94,
+  content page = TUM more space,
+  headline = TUM empty,
+  headline on = {},
+  footline = TUM default,
+  footline on = {every page, title page=false},
+}
+% Match the supplied course cover while retaining the template's artwork.
+\defbeamertemplate{title page}{Course case study}{
+  \nointerlineskip\vskip-2mm\vskip16mm
+  {\fontsize{17}{21}\selectfont\color{black}\inserttitle\par}
+  \vskip8mm
+  {\fontsize{10}{13}\selectfont\color{black}\insertinstitute\par}
+  \vskip1.8mm
+  {\fontsize{10}{13}\selectfont\color{black}\insertdate\par}
+}
+\addtoTUMframestyle{title page}{
+  \setbeamertemplate{title page}[Course case study]
+}
+\setbeamertemplate{itemize item}{\textbullet}
+\setbeamertemplate{itemize subitem}{\textbullet}
+\setbeamertemplate{itemize subsubitem}{\textbullet}
+\setbeamercolor{itemize item}{fg=black}
+\setbeamercolor{itemize subitem}{fg=black}
+\setbeamercolor{itemize subsubitem}{fg=black}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\checkpoint}[1]{\par\medskip\textcolor{TUMBlue}{\textbf{Checkpoint}}\quad #1}
+\newcommand{\reading}[1]{\par\medskip{\footnotesize\textcolor{TUMGrayDark}{Reading: #1}}}
+% Retain instructor reference material in the source, hidden from the deck.
+\newif\ifshowreferences
+\showreferencesfalse
+
+\begin{document}
+\maketitle
+
+\section{Project overview}
+\begin{frame}{The project case study}
+  Your agent controls a moving factory on a grid and learns to reach the goal.
+  \begin{itemize}
+    \item Start with legal movement on an empty map.
+    \item Progress to stochastic movement, fuel constraints and danger.
+    \item Implement the algorithm assigned for each course stage in \file{student/}.
+    \item Evaluate behavior using return, success rate and episode length.
+  \end{itemize}
+  \medskip
+  The repository supplies the environment and shared scripts.\par
+  \note{Sources: repository README and student/README.md, curriculum and game rules. Competition is outside this coursework. Ask students what the agent observes and what it can control.}
+\end{frame}
+
+\begin{frame}{How we will work today}
+  \begin{tabular}{@{}p{0.32\textwidth}p{0.64\textwidth}@{}}
+    \toprule
+    \textbf{Stage} & \textbf{What we will do} \\
+    \midrule
+    Project overview & Understand the task and student workspace \\[0.7em]
+    Download & Obtain the complete repository \\[0.7em]
+    Setup & Install dependencies and run the tests \\[0.7em]
+    Repository tour & Locate the agent, scripts and documentation \\[0.7em]
+    Guided walkthrough & Run, inspect and improve the first policy \\[0.7em]
+    Independent work & Change one thing and compare results \\
+    \bottomrule
+  \end{tabular}
+  \par\medskip
+  We demonstrate each step, then pause while everyone reproduces it locally.
+  \note{Suggested 90-minute session: overview 5 min, download/setup 15 min, repository tour 10 min, walkthrough 35 min, independent work 20 min, checkpoint 5 min. This is a suggested teaching plan, not a course deadline.}
+\end{frame}
+
+\section{Download and setup}
+\begin{frame}[fragile]{1. Download the complete repository}
+  \href{https://github.com/tbhrobrecht/factory-frontier}{\texttt{github.com/tbhrobrecht/factory-frontier}}
+  \par\medskip
+  \textbf{The repository is public.} Open the link to download the project.\par
+  No GitHub account or invitation is needed.
+  \begin{itemize}
+    \item With Git: clone the repository using the command below.
+    \item Without Git: select \textbf{Code / Download ZIP}, then extract\par
+      the complete archive before starting setup.
+  \end{itemize}
+\begin{lstlisting}[literate={.git}{{\textcolor{black}{.git}}}4]
+git clone https://github.com/tbhrobrecht/factory-frontier.git
+cd factory-frontier
+\end{lstlisting}
+  \checkpoint{The project root contains \file{pyproject.toml} and \file{student/}.}
+  \note{Sources: instructor-provided repository URL and public-access status, repository README. ZIP folder names may include a branch suffix. Open the extracted folder containing pyproject.toml. A wheel installs the engine but omits the student workspace. Do not distribute student/sample_code in manually assembled archives.}
+\end{frame}
+
+\begin{frame}[fragile]{2. Setup on Windows}
+  Open a PowerShell terminal in the repository root. Use Python 3.10 or newer.
+\begin{lstlisting}
+python --version
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+python -m pytest
+\end{lstlisting}
+  Reuse an existing \file{.venv} by activating it. Reactivate it in each new terminal.
+  \checkpoint{The installation completes and all tests pass.}
+  \reading{\file{student/WALKTHROUGH.md}, step 1, including setup fixes}
+  \note{Source: student/WALKTHROUGH.md, step 1. Pause for setup. Ask students to check that their editor uses the same virtual environment as the terminal.}
+\end{frame}
+
+\begin{frame}[fragile]{2. Setup on macOS or Linux}
+  Open a terminal in the repository root. Use Python 3.10 or newer.
+\begin{lstlisting}
+python3 --version
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest
+\end{lstlisting}
+  After activation, the slides use \file{python} for all commands.
+  \checkpoint{The installation completes and all tests pass.}
+  \reading{\file{student/WALKTHROUGH.md}, step 1}
+  \note{Source: student/WALKTHROUGH.md, step 1. Students follow the setup slide for their operating system. Skip the other setup slide during live teaching as appropriate.}
+\end{frame}
+
+\section{Repository tour}
+\begin{frame}{3. Repository tour}
+  \small
+  \begin{tabular}{@{}p{0.41\textwidth}p{0.55\textwidth}@{}}
+    \toprule
+    \textbf{Location} & \textbf{What you use it for} \\
+    \midrule
+    \file{student/WALKTHROUGH.md} & Follow the first session step by step \\[0.35em]
+    \file{student/README.md} & Look up rules, observations and algorithms \\[0.35em]
+    \file{student/agent.py} & Implement \file{StudentAgent} \\[0.35em]
+    \file{student/train.py} & Collect experience and call the learning update \\[0.35em]
+    \file{student/evaluate.py} & Measure performance on fixed seeds \\[0.35em]
+    \file{student/student_view.py} & Display one episode for debugging \\[0.35em]
+    \file{student/tests/} & Add tests for your agent \\[0.35em]
+    \file{factory_frontier/}, \file{tests/} & Read the engine and official tests \\
+    \bottomrule
+  \end{tabular}
+  \normalsize
+  \par\medskip
+  Edit your agent and helpers in \file{student/}. Keep the engine and shared scripts unchanged.
+  \checkpoint{Open the walkthrough and \file{student/agent.py} side by side.}
+  \note{Sources: README.md repository layout, student/README.md workspace and the three listed script files. Shared scripts means train.py, evaluate.py and student_view.py, not a directory named shared scripts. Students add their own helpers and tests under student/. Keep the official engine and shared scripts unchanged.}
+\end{frame}
+
+\begin{frame}{Your agent's role in an episode}
+  \begin{enumerate}
+    \item The environment resets and returns the initial observation.
+    \item \file{reset(observation)} prepares the agent's episode memory.
+    \item \file{act(observation)} chooses one legal integer action.
+    \item The environment returns the next observation, reward and ending flags.
+    \item During training, \file{update(...)} learns from this transition.
+  \end{enumerate}
+  \medskip
+  Repeat the action loop until \file{terminated or truncated}.
+  \par\medskip
+  Keep learned parameters across resets. Use observations as policy inputs.
+  \note{Sources: student/agent.py, student/train.py run_episode and student/README.md agent interface. Evaluation and visualization never call update(). env.state and full logs are debugging tools, not policy inputs. Termination and time-limit truncation have different bootstrapping meanings for later learning algorithms.}
+\end{frame}
+
+\section{Guided walkthrough}
+\begin{frame}[fragile]{4. First run: the random starter}
+\begin{lstlisting}
+python -m student.student_view --config intro --seed 42 --render-steps 40
+\end{lstlisting}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.27\textwidth}
+\begin{lstlisting}[language={}]
+. . . . .
+. . . . .
+. . . . .
+. . . . .
+F . . . .
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.69\textwidth}
+      \medskip
+      \file{F} starts at \file{(4, 0)}. The goal is \file{(0, 4)}.\par
+      The display does not mark the goal.
+      \begin{itemize}
+        \item Read the legal actions, chosen action and reward.
+        \item Seed 42: 40 steps, \file{Winner: None}, return about $-0.4$.
+        \item Random failure is expected. Try the same seed again.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \checkpoint{You can run an episode and locate its final result.}
+  \note{Source: student/WALKTHROUGH.md step 2. Map and numerical result match the unchanged starter with seed 42. Ask students why a legal action need not move toward the goal. Initial legal actions are WAIT, NORTH and EAST.}
+\end{frame}
+
+\begin{frame}[fragile]{5. Your first successful policy}
+  In \file{student/agent.py}, add the import at file top. Replace \file{act()} inside the class.
+\begin{lstlisting}[language=Python]
+from factory_frontier import Action
+
+# Inside StudentAgent:
+def act(self, observation: Observation) -> int:
+    mask = observation["action_mask"]
+    if mask[Action.NORTH]:
+        return int(Action.NORTH)
+    if mask[Action.EAST]:
+        return int(Action.EAST)
+    return int(Action.WAIT)
+\end{lstlisting}
+  Run the previous command again. Expect \textbf{8 steps}, \file{Winner: 0}\par
+  and a total return of about \textbf{9.92}.
+  \note{Source: student/WALKTHROUGH.md step 3. The import belongs at the top of the file. Indent the method four spaces inside StudentAgent, as for the original method. Keep the existing Observation import. This hand-written policy demonstrates the interface and does not learn.}
+\end{frame}
+
+\begin{frame}[fragile]{6. The observation and legal-action mask}
+  Temporarily add these lines inside \file{StudentAgent.reset()}:
+\begin{lstlisting}[language=Python]
+height, width = observation["map_shape"]
+print(observation["grid"].shape)
+print(observation["grid"][:height, :width])
+print(observation["factory"])
+print(observation["action_mask"])
+\end{lstlisting}
+  \begin{itemize}
+    \item The padded grid has shape \file{(16, 16)}. The intro map uses \file{5 x 5}.
+    \item The mask has 15 entries. Select actions whose entry is 1.
+    \item An illegal action becomes \file{WAIT} and still consumes a turn.
+  \end{itemize}
+  \checkpoint{Explain why \file{SOUTH} and \file{WEST} are initially unavailable.}
+  \note{Sources: student/WALKTHROUGH.md step 4 and student/README.md observations/actions. Indent these statements inside reset(). Remove the prints after inspecting one episode. At the bottom-left, south and west leave the active map. The full ASCII renderer is a debugging aid. Policies must use their actual observations, especially under PPO's partial visibility.}
+\end{frame}
+
+\begin{frame}[fragile]{7. Evaluation on fixed seeds}
+\begin{lstlisting}
+python -m student.evaluate --config intro --seeds 0 1 2 3 4
+python -m pytest student/tests
+\end{lstlisting}
+  \begin{itemize}
+    \item The north/east policy should win all five intro episodes.
+    \item Compare \textbf{return}, \textbf{success rate} and \textbf{episode length}.
+    \item Use the same seeds when comparing policy changes.
+    \item Evaluation chooses actions without calling \file{update()}.
+  \end{itemize}
+  \checkpoint{Record a baseline result before changing the policy.}
+  \note{Sources: student/WALKTHROUGH.md step 4, student/evaluate.py and student/README.md evaluation. Reported returns are undiscounted. The intro map is deterministic and empty, so these seeds do not test generalization to varied layouts. North/east yields 5/5 successes, 8 steps and 9.92 return.}
+\end{frame}
+
+\begin{frame}[fragile]{8. Stochastic movement in the MDP preset}
+\begin{lstlisting}
+python -m student.student_view --config mdp --seed 42 --render-steps 50
+\end{lstlisting}
+  \begin{itemize}
+    \item Ordinary moves have a 20\% slip probability in \file{mdp}.
+    \item Compare the chosen action with the next printed position.
+    \item Repeat the same seed, then change it to observe another trajectory.
+  \end{itemize}
+  \medskip
+  \file{--config mdp} selects the environment. Your agent still supplies the policy.
+  \checkpoint{Describe how the same policy can produce different trajectories.}
+  \note{Sources: student/WALKTHROUGH.md step 5 and student/README.md MDP section. A legal movement follows its intended direction with probability 0.8, with 0.2/3 for each other direction. Blocked realized moves stay in place. WAIT does not slip. Do not imply this command implements planning.}
+\end{frame}
+
+\begin{frame}[fragile]{9. What the training script does}
+\begin{lstlisting}
+python -m student.train --config intro --episodes 100 --seed 0
+\end{lstlisting}
+  \begin{itemize}
+    \item The script evaluates a baseline, collects experience and evaluates again.
+    \item Training calls \file{StudentAgent.update()} after each transition.
+    \item The starter's \file{update()} is empty. You implement learning here.
+    \item Metrics go to \file{student/results/training_summary.json}.
+  \end{itemize}
+  \medskip
+  A saved policy requires your own \file{save(path)} and \file{load(path)} methods.\par
+  A later run creates a fresh agent unless you explicitly load a checkpoint.
+  \note{Sources: student/train.py, student/agent.py and student/README.md training. Keep the distinction between running a script and implementing an algorithm clear. The hand-written intro policy also does not learn. save/load are optional interface extensions absent from the starter. The appendix shows commands for trained checkpoints.}
+\end{frame}
+
+\begin{frame}{The course stages}
+  \begin{tabular}{@{}p{0.43\textwidth}p{0.53\textwidth}@{}}
+    \toprule
+    \textbf{Environment preset} & \textbf{Corresponding course exercise} \\
+    \midrule
+    \file{intro} & Legal actions and a first policy \\[0.35em]
+    \file{mdp} & States, rewards and stochastic transitions \\[0.35em]
+    \file{dynamic_programming} & Policy evaluation, policy/value iteration \\[0.35em]
+    \file{monte_carlo_td} & Monte Carlo and TD prediction \\[0.35em]
+    \file{model_free_control} & SARSA or Q-learning \\[0.35em]
+    \file{function_approximation} & Linear or neural value functions \\[0.35em]
+    \file{policy_methods} & REINFORCE and actor-critic \\[0.35em]
+    \file{ppo} & Rollouts and clipped policy updates \\
+    \bottomrule
+  \end{tabular}
+  \par\medskip
+  Presets configure the environment. Students implement the assigned algorithm.
+  \note{Source: student/README.md curriculum. This is a course roadmap, not a requirement to implement all algorithms today. The same agent interface, action indices and default observation shapes carry across the eight presets. Competition is outside the course scope.}
+\end{frame}
+
+\section{Independent work}
+\begin{frame}{10. Independent exploration}
+  \begin{enumerate}
+    \item \textbf{Change the intro policy.}\par
+      Prefer east before north. Predict the path, then run the visualizer.
+    \item \textbf{Compare the policies.}\par
+      Evaluate both versions on seeds 0--4. Record the three metrics.
+    \item \textbf{Try stochastic movement.}\par
+      Run \file{mdp} with seeds 42 and 7. Explain a surprising transition.
+    \item \textbf{Trace one transition in the code.}\par
+      Find where \file{train.py} calls \file{act()}, \file{env.step()} and \file{update()}.
+  \end{enumerate}
+  \medskip
+  Work individually in \file{student/}. Ask for help when a checkpoint fails.
+  \note{Exercise based on student/WALKTHROUGH.md steps 2--6. Suggested 20 minutes. Students write a prediction before running. Early finishers add a test that the policy returns a legal action. Ask students to explain results to a neighbor after completing their own run. Keep the exercise on interface familiarity, without requiring a learning implementation today.}
+\end{frame}
+
+\begin{frame}{Your experiment record}
+  Keep a short note for each comparison:
+  \begin{itemize}
+    \item \textbf{Question:} what behavior do you expect to change?
+    \item \textbf{Setup:} preset, policy version, environment seeds and agent seed.
+    \item \textbf{Results:} return, successes/episodes and episode lengths.
+    \item \textbf{Explanation:} what changed, and what evidence supports it?
+  \end{itemize}
+  \medskip
+  Example question: Does preferring east change the intro path or its return?
+  \par\medskip
+  Change one factor at a time. Later, test new map seeds separately\par
+  to measure generalization beyond the training maps.
+  \note{Sources: student/README.md training/evaluation and walkthrough comparison prompts. This record is a suggested working format, not an announced graded submission. Both deterministic shortest intro policies should take 8 steps and earn 9.92, while producing different paths. Stochastic runs require repeated trials before making performance claims.}
+\end{frame}
+
+\begin{frame}{Ready for the next project stage}
+  Before you move on, check that you can:
+  \begin{itemize}
+    \item Run the tests and visualize an episode.
+    \item Reach the intro goal with your own policy.
+    \item Explain the observation and choose a legal action.
+    \item Evaluate fixed seeds and interpret the output.
+    \item Locate the learning hook and explain how slip changes movement.
+  \end{itemize}
+  \medskip
+  \textbf{Next:} follow the assigned algorithm stage in \file{student/README.md}.\par
+  Keep your implementation and tests inside \file{student/}.
+  \note{Sources: student/WALKTHROUGH.md final checklist and student/README.md workspace. Ask for a quick show of progress on each checkpoint and gather unresolved blockers. Later submissions need an importable StudentAgent and required checkpoints inside student/; official grading uses a clean engine. Announce actual deadlines, teams and grading separately once established.}
+\end{frame}
+
+\appendix
+\ifshowreferences
+\section{Reference}
+\begin{frame}[fragile]{Reference: common setup issues}
+  \textbf{GitHub reports that the repository is unavailable}\par
+  Check the repository URL and your connection. The public repository needs no login.
+  \par\medskip
+  \textbf{PowerShell blocks activation}\par
+  Apply this to the current terminal session, then activate again:
+\begin{lstlisting}
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+\end{lstlisting}
+  \textbf{Imports fail or the wrong Python environment runs}\par
+  Return to the folder containing \file{pyproject.toml}, activate \file{.venv},\par
+  then repeat \file{python -m pip install -e ".[dev]"}.
+  \note{Sources: student/WALKTHROUGH.md step 1 and instructor-reported public repository. A managed machine may enforce a policy that cannot be changed at process scope; use the environment interpreter directly if appropriate, for example .venv/Scripts/python.exe. Ask for the exact command and error output.}
+\end{frame}
+
+\begin{frame}[fragile]{Reference: training and saved policies}
+  \textbf{After implementing learning and checkpoint save/load (PowerShell):}
+\begin{lstlisting}
+$stage = "model_free_control"
+$model = "student/checkpoints/model_free_control.checkpoint"
+python -m student.train --config $stage --map-seed 0 --episodes 3000
+python -m student.evaluate --config $stage --seeds 0 --checkpoint $model
+\end{lstlisting}
+  \begin{itemize}
+    \item Training starts on one fixed map. The trainer saves when \file{save()} exists.
+    \item The evaluation command requires \file{load()} and a compatible checkpoint.
+    \item Then evaluate unseen maps using \file{--seeds 100 101 102}.
+    \item Fuel tasks require refueling. Default \file{model_free_control} needs mining.
+  \end{itemize}
+  \reading{\file{student/README.md}, ``Train, evaluate and watch''}
+  \note{Source: student/README.md training and fuel-task defaults; student/train.py and student/evaluate.py. Long commands are single terminal lines. This is a later-stage reference, not part of today's required exercise. load(path) is a class method returning a ready agent. Without --checkpoint, evaluation starts a fresh agent. Same-map success does not establish generalization.}
+\end{frame}
+\fi
+\end{document}
